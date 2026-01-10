@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RE 1.5 - Browser Edition</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="loading-layer">
+    <h1>INITIALIZING...</h1>
+    <div id="progress-bar-container"><div id="progress-bar"></div></div>
+    <p>(Loading Assets...)</p>
+</div>
+
+<div id="menu-layer">
+    <h1 class="title-text">RESIDENT EVIL: WEB</h1>
+    <p>SELECT CHARACTER</p>
+    <div class="char-select-container">
+        <div class="char-card" id="btn-leon"><h3 style="color:#4466ff">LEON</h3>Stats: Balanced</div>
+        <div class="char-card" id="btn-claire"><h3 style="color:#ff4444">CLAIRE</h3>Stats: Fast</div>
+        <div class="char-card" id="btn-hunk"><h3 style="color:#888888">HUNK</h3>Stats: Tank</div>
+    </div>
+    <p class="controls-text">W/S: Move Forward/Back | A/D: Turn Left/Right | SHIFT: Run | RMB: Aim | LMB: Fire | R: Reload | Q: Quick Turn | I: Inventory | P: Pause | M: Dance (Leon)</p>
+</div>
+
+<div id="pause-menu">
+    <h1>PAUSED</h1>
+    <button class="btn" id="btn-resume">RESUME</button>
+    <button class="btn" onclick="location.reload()">EXIT</button>
+</div>
+
+<div id="ui-layer">
+    <div id="crosshair">+</div>
+    <div id="round-hud">ROUND: 1</div>
+    <div id="health-hud">STATUS: <span id="hp-text">FINE</span></div>
+    <div id="weapon-hud"><span id="weapon-name">PISTOL</span> <span id="ammo-count">15/30</span></div>
+    <div id="center-msg"></div>
+    
+    <div id="inventory-panel">
+        <div id="inventory-header">INVENTORY</div>
+        <div id="inventory-grid"></div>
+        <div id="inventory-footer">Click weapons to equip | Click herbs to heal</div>
+    </div>
+</div>
+
+<div id="game-over-screen">
+    <h1 style="color:red; font-size: 60px;">YOU DIED</h1>
+    <button class="btn" onclick="location.reload()">TRY AGAIN</button>
+</div>
+
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+</script>
+<script type="module" src="game.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Leaf shape -->
+  <ellipse cx="32" cy="20" rx="12" ry="18" fill="#00ff00" opacity="0.9"/>
+  <ellipse cx="22" cy="28" rx="10" ry="16" fill="#00cc00" opacity="0.8" transform="rotate(-30 32 32)"/>
+  <ellipse cx="42" cy="28" rx="10" ry="16" fill="#00cc00" opacity="0.8" transform="rotate(30 32 32)"/>
+  
+  <!-- Stem -->
+  <rect x="30" y="35" width="4" height="25" fill="#228B22"/>
+  
+  <!-- Shine effect -->
+  <ellipse cx="28" cy="18" rx="3" ry="6" fill="#ffffff" opacity="0.4"/>
+</svg>

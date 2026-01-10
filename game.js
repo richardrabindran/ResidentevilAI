@@ -1,0 +1,1484 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// --- CONFIGURATION ---
+const CONFIG = {
+    ROTATION_SPEED: 3.0,
+    MOUSE_SENSITIVITY: 0.002, // Lowered slightly for precision
+    SPRINT_MULTIPLIER: 1.5,
+    MAX_PITCH: 0.8,
+    INVINCIBILITY_TIME: 1000,
+    GRAVITY: 9.8,
+    QUICKTURN_DURATION: 0.3 // Seconds
+};
+
+// --- WEAPON DATA ---
+const WEAPONS = {
+    pistol: {
+        name: 'Matilda',
+        type: 'gun',
+        damageClose: 20,
+        damageFar: 10,
+        falloffStart: 15,
+        falloffEnd: 30,
+        fireRate: 400,
+        magSize: 15,
+        reloadTime: 1200,
+        spread: 0,
+        color: 0x888888,
+        scale: { x: 0.05, y: 0.1, z: 0.2 }
+    },
+    shotgun: {
+        name: 'W-870',
+        type: 'gun',
+        damageClose: 50,
+        damageFar: 10,
+        falloffStart: 5,
+        falloffEnd: 12,
+        pellets: 6,
+        spread: 0.15,
+        fireRate: 1100,
+        magSize: 8,
+        reloadTime: 2500,
+        color: 0x444444,
+        scale: { x: 0.08, y: 0.1, z: 0.6 }
+    },
+    rifle: {
+        name: 'AR-15',
+        type: 'gun',
+        damageClose: 30,
+        damageFar: 20,
+        falloffStart: 20,
+        falloffEnd: 50,
+        fireRate: 150,
+        magSize: 30,
+        reloadTime: 2000,
+        spread: 0.02,
+        color: 0x555555,
+        scale: { x: 0.06, y: 0.12, z: 0.7 }
+    },
+    smg: {
+        name: 'MP5',
+        type: 'gun',
+        damageClose: 18,
+        damageFar: 12,
+        falloffStart: 10,
+        falloffEnd: 25,
+        fireRate: 120,
+        magSize: 30,
+        reloadTime: 1800,
+        spread: 0.05,
+        color: 0x666666,
+        scale: { x: 0.05, y: 0.1, z: 0.4 }
+    },
+    magnum: {
+        name: 'Magnum',
+        type: 'gun',
+        damageClose: 80,
+        damageFar: 60,
+        falloffStart: 25,
+        falloffEnd: 60,
+        fireRate: 800,
+        magSize: 6,
+        reloadTime: 2200,
+        spread: 0,
+        color: 0xccaa00,
+        scale: { x: 0.06, y: 0.12, z: 0.25 }
+    },
+    knife: {
+        name: 'Combat Knife',
+        type: 'melee',
+        damage: 35,
+        fireRate: 600,
+        color: 0xcccccc,
+        scale: { x: 0.02, y: 0.05, z: 0.25 }
+    }
+};
+
+const CHARACTERS = {
+    leon:  { color: 0x4466ff, speed: 4.5, hp: 60 },
+    claire:{ color: 0xff4444, speed: 6.0, hp: 50 },
+    hunk:  { color: 0x888888, speed: 3.5, hp: 80 }
+};
+
+// --- LEON ANIMATIONS MAPPING ---
+const LEON_ANIMATIONS = {
+    dance: 'dance',
+    knife_death: 'knife_death',
+    knife_idle: 'knife_idle',
+    knife_stab1: 'knife_stab1',
+    knife_stab2: 'knife_stab2',
+    knife_stab3: 'knife_stab3',
+    knife_stab4: 'knife_stab4', // Extra animation available
+    pistol_aim: 'pistol_aim',
+    pistol_back: 'pistol_back',
+    pistol_death: 'pistol_death', // Use this for pistol death instead of knife_death
+    pistol_fire: 'pistol_fire', // Pistol fire animation
+    pistol_hit: 'pistol_hit',
+    pistol_hit2: 'pistol_hit2',
+    pistol_idle: 'pistol_idle',
+    pistol_run: 'pistol_run',
+    pistol_walk: 'pistol_walk',
+    reload: 'reload',
+    shotgun_ads: 'shotgun_ads',
+    shotgun_aim: 'shotgun_aim',
+    shotgun_back: 'shotgun_walk', // Use first shotgun_walk for backward (1.300s - shorter)
+    shotgun_death: 'shotgun_death',
+    shotgun_fire: 'shotgun_fire',
+    shotgun_idle: 'shotgun_idle',
+    shotgun_walk: 'shotgun_walk_1', // Use second shotgun_walk for forward (1.333s)
+    shotgun_run: 'shotgun_run'
+};
+
+// --- GLOBALS ---
+let camera, scene, renderer, clock;
+let player, currentWeaponMesh;
+let bullets = [], enemies = [], pickups = [];
+let input = { w: false, s: false, a: false, d: false, shift: false, aim: false, fire: false, mouseX: 0, mouseY: 0, m: false };
+let inventory = [];
+let inventoryOpen = false;
+let currentCharacter = 'leon'; // Track current character
+let cameraYaw = 0; // Camera yaw rotation (horizontal) for aiming
+let cameraPitch = 0; // Camera pitch rotation (vertical) for aiming
+
+// Leon model and animations
+let leonModel = null;
+let leonAnimator = null;
+
+let gameState = {
+    isPlaying: false, isPaused: false, isDead: false,
+    hp: 60, maxHp: 60,
+    currentWeapon: 'pistol',
+    weaponStates: { 
+        pistol: { ammo: 15, reserve: 60 },
+        shotgun: { ammo: 8, reserve: 16 },
+        rifle: { ammo: 30, reserve: 90 },
+        smg: { ammo: 30, reserve: 90 },
+        magnum: { ammo: 6, reserve: 12 },
+        knife: { ammo: 1, reserve: 0 }
+    },
+    lastFireTime: 0,
+    isReloading: false,
+    aimPitch: 0,
+    round: 1,
+    enemiesToSpawn: 0, enemiesSpawned: 0, enemiesAlive: 0,
+    lastSpawnTime: 0,
+    lastHitTime: 0,
+    isDancing: false,
+    lastStabIndex: -1, // Track which stab animation was last used
+    shotgunAdsPlayed: false, // Track if ads animation has been played
+    
+    // Quickturn State
+    isQuickTurning: false,
+    quickTurnTimer: 0,
+    quickTurnStartRot: 0,
+    quickTurnTargetRot: 0,
+    
+    // Animation tracking
+    lastAnimationName: null,
+    
+    // Death animation state
+    isPlayingDeathAnimation: false,
+    deathAnimationComplete: false
+};
+
+clock = new THREE.Clock();
+
+init();
+
+function init() {
+    // 1. Scene
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+    scene.fog = new THREE.Fog(0x111111, 10, 50);
+
+    // 2. Camera
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+
+    // 3. Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    // 4. Lights
+    const ambi = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambi);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(5, 10, 5);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    // 5. Environment
+    const grid = new THREE.GridHelper(100, 50, 0x00ff00, 0x111111);
+    scene.add(grid);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    setupUI();
+    
+    window.addEventListener('resize', onResize);
+    window.addEventListener('keydown', e => onKey(e, true));
+    window.addEventListener('keyup', e => onKey(e, false));
+    window.addEventListener('mousedown', e => onMouse(e, true));
+    window.addEventListener('mouseup', e => onMouse(e, false));
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Fake Load
+    setTimeout(() => {
+        document.getElementById('loading-layer').style.display = 'none';
+        document.getElementById('menu-layer').style.display = 'flex';
+    }, 1000);
+
+    animate();
+}
+
+function setupUI() {
+    document.getElementById('btn-leon').onclick = () => selectCharacter('leon');
+    document.getElementById('btn-claire').onclick = () => selectCharacter('claire');
+    document.getElementById('btn-hunk').onclick = () => selectCharacter('hunk');
+    document.getElementById('btn-resume').onclick = togglePause;
+}
+
+// --- LEON ANIMATOR CLASS ---
+class LeonAnimator {
+    constructor(model) {
+        this.model = model;
+        this.mixer = new THREE.AnimationMixer(model);
+        this.actions = {};
+        this.currentAction = null;
+        this.nextAction = null;
+        
+        // Build action map from loaded animations, handling duplicates
+        if (model.animations && model.animations.length > 0) {
+            const nameCount = {}; // Track how many times we've seen each name
+            model.animations.forEach(clip => {
+                let key = clip.name;
+                
+                // If we've seen this name before, add a suffix
+                if (nameCount[clip.name] === undefined) {
+                    nameCount[clip.name] = 0;
+                } else {
+                    nameCount[clip.name]++;
+                    key = `${clip.name}_${nameCount[clip.name]}`;
+                }
+                
+                this.actions[key] = this.mixer.clipAction(clip);
+            });
+            console.log('LeonAnimator initialized with animations:', Object.keys(this.actions));
+        } else {
+            console.warn('No animations found in Leon model');
+        }
+    }
+    
+    // Find animation by name with fallback support (case-insensitive partial match)
+    findAnimation(targetName) {
+        // First try exact match
+        if (this.actions[targetName]) {
+            return targetName;
+        }
+        
+        // Try case-insensitive match
+        const keys = Object.keys(this.actions);
+        const lowerTarget = targetName.toLowerCase();
+        for (let key of keys) {
+            if (key.toLowerCase() === lowerTarget) {
+                return key;
+            }
+        }
+        
+        // Try partial match
+        for (let key of keys) {
+            if (key.toLowerCase().includes(lowerTarget)) {
+                console.log(`Using partial match: ${targetName} -> ${key}`);
+                return key;
+            }
+        }
+        
+        return null;
+    }
+    
+    playAnimation(animName, shouldLoop = true) {
+        const actualAnimName = this.findAnimation(animName);
+        
+        if (!actualAnimName) {
+            console.warn(`❌ Animation '${animName}' NOT FOUND. Available animations:`, Object.keys(this.actions));
+            return;
+        }
+        
+        const action = this.actions[actualAnimName];
+        
+        // If this animation is already playing, don't restart it
+        if (this.currentAction === action && action.isRunning()) {
+            return;
+        }
+        
+        // Stop current action with fade
+        if (this.currentAction && this.currentAction !== action) {
+            this.currentAction.fadeOut(0.2);
+        }
+        
+        action.reset();
+        action.clampWhenFinished = !shouldLoop;
+        action.loop = shouldLoop ? THREE.LoopRepeat : THREE.LoopOnce;
+        action.fadeIn(0.2);
+        action.play();
+        
+        console.log(`✓ Playing: '${animName}' (actual: '${actualAnimName}', loop: ${shouldLoop})`);
+        
+        this.currentAction = action;
+        return action;
+    }
+    
+    update(dt) {
+        if (this.mixer) this.mixer.update(dt);
+    }
+}
+
+// --- LOAD LEON MODEL ---
+async function loadLeonModel() {
+    return new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+        loader.load(
+            'assets/Leon/leon.glb',
+            (gltf) => {
+                const model = gltf.scene;
+                model.scale.set(0.875, 0.875, 0.875); // 1.75x the previous 0.5 scale
+                model.rotation.y = 0; // Face forward (don't rotate)
+                model.castShadow = true;
+                model.traverse(node => {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                    
+                    // Fix transparency issues more selectively
+                    if (node.material) {
+                        const materials = Array.isArray(node.material) ? node.material : [node.material];
+                        materials.forEach(material => {
+                            // Only fix materials that have transparency but full opacity
+                            if (material.transparent && material.opacity >= 1.0) {
+                                material.transparent = false;
+                                material.needsUpdate = true;
+                            }
+                            // Ensure proper depth testing
+                            material.depthTest = true;
+                            material.depthWrite = true;
+                        });
+                    }
+                });
+                
+                // CRITICAL: Store animations on the model so animator can access them
+                model.animations = gltf.animations;
+                
+                // Debug: Log all animations in the model
+                console.log('Available animations:', gltf.animations.map(clip => clip.name));
+                
+                resolve(model);
+            },
+            (progress) => {
+                // Optional: track loading progress
+            },
+            (error) => {
+                console.error('Failed to load Leon model:', error);
+                reject(error);
+            }
+        );
+    });
+}
+
+function createBlockPlayer(color) {
+    const group = new THREE.Group();
+    
+    // Body (1.8m tall)
+    const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 1.8, 0.3),
+        new THREE.MeshStandardMaterial({ color: color })
+    );
+    body.position.y = 0.9; 
+    body.castShadow = true;
+    group.add(body);
+    
+    // Head
+    const head = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.3, 0.3),
+        new THREE.MeshStandardMaterial({ color: 0xffccaa })
+    );
+    head.position.set(0, 1.95, 0);
+    group.add(head);
+    
+    // Right Arm Container (for Pitch rotation)
+    const armGroup = new THREE.Group();
+    armGroup.name = 'RightArm';
+    armGroup.position.set(0.35, 1.45, 0); 
+    group.add(armGroup);
+
+    // Arm Mesh
+    const arm = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15, 0.6, 0.15),
+        new THREE.MeshStandardMaterial({ color: color })
+    );
+    arm.position.y = -0.3; // Hang down
+    armGroup.add(arm);
+
+    return group;
+}
+
+function selectCharacter(type) {
+    if (player) scene.remove(player);
+    
+    currentCharacter = type;
+    leonModel = null;
+    leonAnimator = null;
+    
+    // Load Leon model asynchronously, or create block models for others
+    if (type === 'leon') {
+        loadLeonModel().then(model => {
+            player = model;
+            player.position.set(0, 0, 0);
+            player.rotation.order = 'YXZ'; // Ensure consistent rotation order
+            scene.add(player);
+            
+            // Initialize animator with small delay to ensure model is fully loaded
+            setTimeout(() => {
+                leonAnimator = new LeonAnimator(player);
+                if (leonAnimator && Object.keys(leonAnimator.actions).length > 0) {
+                    leonAnimator.playAnimation(getLeonIdleAnimation(), true);
+                } else {
+                    console.error('Failed to initialize animations for Leon');
+                }
+                
+                initializeCharacter(type);
+            }, 50);
+        }).catch(err => {
+            console.error('Failed to load Leon model, using block model:', err);
+            player = createBlockPlayer(CHARACTERS[type].color);
+            scene.add(player);
+            initializeCharacter(type);
+        });
+    } else {
+        player = createBlockPlayer(CHARACTERS[type].color);
+        scene.add(player);
+        initializeCharacter(type);
+    }
+}
+
+function initializeCharacter(type) {
+    // Stats
+    gameState.hp = CHARACTERS[type].hp;
+    gameState.maxHp = gameState.hp;
+    gameState.round = 1;
+    gameState.isDead = false;
+    gameState.isReloading = false;
+    gameState.isDancing = false;
+    gameState.lastStabIndex = -1;
+    gameState.shotgunAdsPlayed = false;
+    
+    // Reset Inventory
+    Object.keys(gameState.weaponStates).forEach(k => {
+        gameState.weaponStates[k].ammo = WEAPONS[k].magSize || 1;
+        gameState.weaponStates[k].reserve = (WEAPONS[k].magSize || 0) * 3;
+    });
+
+    // Character-specific weapons
+    if (type === 'leon') {
+        inventory = [
+            { type: 'weapon', id: 'pistol' },
+            { type: 'weapon', id: 'shotgun' },
+            { type: 'weapon', id: 'knife' },
+            { type: 'herb', amount: 3 }
+        ];
+        equipWeapon('pistol');
+    } else if (type === 'claire') {
+        inventory = [
+            { type: 'weapon', id: 'pistol' },
+            { type: 'weapon', id: 'smg' },
+            { type: 'weapon', id: 'knife' },
+            { type: 'herb', amount: 3 }
+        ];
+        equipWeapon('pistol');
+    } else if (type === 'hunk') {
+        inventory = [
+            { type: 'weapon', id: 'magnum' },
+            { type: 'weapon', id: 'rifle' },
+            { type: 'weapon', id: 'knife' },
+            { type: 'herb', amount: 2 }
+        ];
+        equipWeapon('magnum');
+    }
+    
+    startRound(1);
+    
+    document.getElementById('menu-layer').style.display = 'none';
+    document.getElementById('ui-layer').style.display = 'block';
+    gameState.isPlaying = true;
+    updateInventoryDisplay();
+    updateUI();
+}
+
+function equipWeapon(key) {
+    gameState.currentWeapon = key;
+    gameState.isReloading = false;
+    gameState.shotgunAdsPlayed = false; // Reset ads state when switching weapons
+    
+    // For Leon model, play appropriate idle animation
+    if (currentCharacter === 'leon' && leonAnimator) {
+        leonAnimator.playAnimation(getLeonIdleAnimation(), true);
+    }
+    
+    // For block models
+    const arm = player.getObjectByName('RightArm');
+    if (!arm) return;
+
+    if (currentWeaponMesh) {
+        currentWeaponMesh.parent.remove(currentWeaponMesh);
+        currentWeaponMesh = null;
+    }
+
+    const wCfg = WEAPONS[key];
+    const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(wCfg.scale.x, wCfg.scale.y, wCfg.scale.z),
+        new THREE.MeshStandardMaterial({ color: wCfg.color })
+    );
+    
+    // Attach to hand
+    mesh.position.set(0, -0.6, 0.2);
+    mesh.castShadow = true;
+    
+    arm.add(mesh);
+    currentWeaponMesh = mesh;
+    
+    updateUI();
+}
+
+// --- LEON ANIMATION HELPERS ---
+function getLeonIdleAnimation() {
+    switch(gameState.currentWeapon) {
+        case 'knife':
+            return LEON_ANIMATIONS.knife_idle;
+        case 'pistol':
+            return LEON_ANIMATIONS.pistol_idle;
+        case 'shotgun':
+            return LEON_ANIMATIONS.shotgun_idle;
+        default:
+            return LEON_ANIMATIONS.pistol_idle;
+    }
+}
+
+function getLeonWalkAnimation() {
+    switch(gameState.currentWeapon) {
+        case 'knife':
+            return LEON_ANIMATIONS.pistol_walk; // Use pistol walk as fallback
+        case 'pistol':
+            return LEON_ANIMATIONS.pistol_walk;
+        case 'shotgun':
+            return LEON_ANIMATIONS.shotgun_walk;
+        default:
+            return LEON_ANIMATIONS.pistol_walk;
+    }
+}
+
+function getLeonRunAnimation() {
+    switch(gameState.currentWeapon) {
+        case 'knife':
+            return LEON_ANIMATIONS.pistol_run; // Use pistol run as fallback
+        case 'pistol':
+            return LEON_ANIMATIONS.pistol_run;
+        case 'shotgun':
+            return LEON_ANIMATIONS.shotgun_run;
+        default:
+            return LEON_ANIMATIONS.pistol_run;
+    }
+}
+
+function getLeonBackwardAnimation() {
+    switch(gameState.currentWeapon) {
+        case 'knife':
+            return LEON_ANIMATIONS.pistol_back; // Use pistol back as fallback
+        case 'pistol':
+            return LEON_ANIMATIONS.pistol_back;
+        case 'shotgun':
+            return LEON_ANIMATIONS.shotgun_back;
+        default:
+            return LEON_ANIMATIONS.pistol_back;
+    }
+}
+
+function getNextStabAnimation() {
+    const stabs = [
+        LEON_ANIMATIONS.knife_stab1,
+        LEON_ANIMATIONS.knife_stab2,
+        LEON_ANIMATIONS.knife_stab3
+    ];
+    
+    // Cycle through stabs, avoiding the same twice in a row
+    let nextIndex = (gameState.lastStabIndex + 1) % stabs.length;
+    gameState.lastStabIndex = nextIndex;
+    return stabs[nextIndex];
+}
+
+// --- ENEMY ---
+function createBlockZombie() {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.5, 1.8, 0.3),
+        new THREE.MeshStandardMaterial({ color: 0x228822 })
+    );
+    body.position.y = 0.9;
+    body.castShadow = true;
+    group.add(body);
+    
+    const head = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.3, 0.3),
+        new THREE.MeshStandardMaterial({ color: 0x44aa44 })
+    );
+    head.position.set(0, 1.95, 0.1);
+    group.add(head);
+
+    const armGeo = new THREE.BoxGeometry(0.1, 0.7, 0.1);
+    const leftArm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({ color: 0x228822 }));
+    leftArm.position.set(-0.35, 1.4, 0.4);
+    leftArm.rotation.x = -Math.PI / 2;
+    group.add(leftArm);
+
+    const rightArm = new THREE.Mesh(armGeo, new THREE.MeshStandardMaterial({ color: 0x228822 }));
+    rightArm.position.set(0.35, 1.4, 0.4);
+    rightArm.rotation.x = -Math.PI / 2;
+    group.add(rightArm);
+
+    return group;
+}
+
+// --- GAME LOOP ---
+function update(dt) {
+    // Update Leon animator if active (even during death animation)
+    if (currentCharacter === 'leon' && leonAnimator) {
+        leonAnimator.update(dt);
+    }
+    
+    // If death animation is playing, only update animator and camera - skip all other game logic
+    if (gameState.isPlayingDeathAnimation) {
+        updateCamera();
+        return;
+    }
+    
+    // Stop other game logic if dead (but before death animation state is set)
+    if (!gameState.isPlaying || gameState.isPaused || gameState.isDead) return;
+
+    // 1. Quickturn Logic
+    if (gameState.isQuickTurning) {
+        gameState.quickTurnTimer += dt;
+        const progress = Math.min(gameState.quickTurnTimer / CONFIG.QUICKTURN_DURATION, 1.0);
+        // Smooth ease-out
+        const t = 1 - Math.pow(1 - progress, 3); 
+        
+        // Interpolate rotation
+        const newRot = THREE.MathUtils.lerp(gameState.quickTurnStartRot, gameState.quickTurnTargetRot, t);
+        player.rotation.y = newRot;
+
+        if (progress >= 1.0) gameState.isQuickTurning = false;
+        
+        // Camera logic handles the rest
+        updateCamera();
+        return; // Skip other movement while turning
+    }
+
+    // 2. Mouse Look & Aim Control
+    // When aiming: mouse controls player rotation (yaw) and aim pitch (vertical)
+    // Player rotates with mouse but stays stationary (no WASD movement)
+    if (input.aim) {
+        // Horizontal mouse movement rotates the player
+        player.rotation.y -= input.mouseX * CONFIG.MOUSE_SENSITIVITY;
+        
+        // Vertical mouse movement controls aim pitch
+        cameraPitch -= input.mouseY * CONFIG.MOUSE_SENSITIVITY;
+        cameraPitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, cameraPitch));
+        
+        gameState.aimPitch = cameraPitch;
+    } else {
+        // Reset camera pitch when not aiming
+        cameraPitch = 0;
+        gameState.aimPitch = 0;
+        gameState.shotgunAdsPlayed = false;
+    }
+    input.mouseX = 0;
+    input.mouseY = 0;
+    
+    // Apply Pitch to Arm (for block models)
+    const arm = player.getObjectByName('RightArm');
+    if (arm) {
+        const targetPitch = input.aim ? (-Math.PI/2 + gameState.aimPitch) : 0;
+        arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, targetPitch, dt * 15);
+    }
+
+    // 3. TANK CONTROLS MOVEMENT (RE4 Style)
+    // Player cannot move while aiming or reloading
+    let isMoving = false;
+    let moveDirection = 'idle'; // idle, forward, backward, run
+    
+    if (!input.aim && !gameState.isReloading && !gameState.isDancing) {
+        const charSpeed = CHARACTERS[currentCharacter].speed;
+        
+        // A = Rotate LEFT (Tank Controls)
+        if (input.a) {
+            player.rotation.y += CONFIG.ROTATION_SPEED * dt;
+        }
+        
+        // D = Rotate RIGHT (Tank Controls)
+        if (input.d) {
+            player.rotation.y -= CONFIG.ROTATION_SPEED * dt;
+        }
+        
+        // W = Forward (can run with SHIFT)
+        if (input.w) {
+            const moveSpeed = input.shift ? (charSpeed * CONFIG.SPRINT_MULTIPLIER * dt) : (charSpeed * dt);
+            player.translateZ(moveSpeed);
+            isMoving = true;
+            moveDirection = input.shift ? 'run' : 'forward';
+        }
+        
+        // S = Backward (walk only, no running)
+        if (input.s) {
+            const backSpeed = charSpeed * 0.6 * dt;
+            player.translateZ(-backSpeed);
+            isMoving = true;
+            moveDirection = 'backward';
+        }
+    }
+    
+    // Update Leon animations based on state (PRIORITY ORDER)
+    if (currentCharacter === 'leon' && leonAnimator) {
+        let targetAnim = null;
+        
+        // Priority 1: Dancing (overrides everything)
+        if (gameState.isDancing) {
+            // Dance animation is already playing, don't interrupt
+            targetAnim = null; // Skip animation update
+        }
+        // Priority 2: Reloading
+        else if (gameState.isReloading) {
+            // Reload animation is already playing from startReload()
+            targetAnim = null; // Skip animation update
+        }
+        // Priority 3: Aiming
+        else if (input.aim) {
+            if (gameState.currentWeapon === 'pistol') {
+                targetAnim = LEON_ANIMATIONS.pistol_aim;
+            } else if (gameState.currentWeapon === 'shotgun') {
+                targetAnim = LEON_ANIMATIONS.shotgun_aim;
+            } else {
+                targetAnim = getLeonIdleAnimation();
+            }
+        }
+        // Priority 4: Movement
+        else if (moveDirection === 'run') {
+            targetAnim = getLeonRunAnimation();
+        } else if (moveDirection === 'forward') {
+            targetAnim = getLeonWalkAnimation();
+        } else if (moveDirection === 'backward') {
+            targetAnim = getLeonBackwardAnimation();
+        }
+        // Priority 5: Idle (default)
+        else {
+            targetAnim = getLeonIdleAnimation();
+        }
+        
+        // Only play animation if target changed from last frame
+        if (targetAnim && targetAnim !== gameState.lastAnimationName) {
+            console.log(`[ANIM] ${gameState.lastAnimationName} → ${targetAnim}`);
+            leonAnimator.playAnimation(targetAnim, true);
+            gameState.lastAnimationName = targetAnim;
+        }
+    }
+
+    // 4. Fire
+    if (input.fire && !gameState.isReloading && !gameState.isDancing) {
+        // Only allow firing when aiming (RMB held down)
+        if (!input.aim) {
+            input.fire = false;
+            return;
+        }
+        
+        // Cancel dance if active
+        if (gameState.isDancing) {
+            gameState.isDancing = false;
+            if (leonAnimator) {
+                leonAnimator.playAnimation(getLeonIdleAnimation(), true);
+            }
+        }
+        
+        if (gameState.currentWeapon === 'knife') performMelee();
+        else shootGun();
+        input.fire = false;
+    }
+    
+    // 5. Dance (Leon only, M key)
+    if (currentCharacter === 'leon' && input.m && !gameState.isDancing) {
+        gameState.isDancing = true;
+        if (leonAnimator) {
+            leonAnimator.playAnimation(LEON_ANIMATIONS.dance, true); // Loop continuously
+        }
+        input.m = false;
+    }
+    
+    // Cancel dance if any action is pressed
+    if (gameState.isDancing && (input.w || input.s || input.a || input.d || input.aim || input.fire || gameState.isReloading)) {
+        gameState.isDancing = false;
+        if (leonAnimator) {
+            leonAnimator.playAnimation(getLeonIdleAnimation(), true);
+        }
+    }
+
+    updateCamera();
+    updateBullets(dt);
+    updateEnemies(dt);
+    updatePickups(dt);
+}
+
+function shootGun() {
+    const w = gameState.weaponStates[gameState.currentWeapon];
+    const cfg = WEAPONS[gameState.currentWeapon];
+    
+    if (Date.now() - gameState.lastFireTime < cfg.fireRate) return;
+    if (w.ammo <= 0) { showMessage("EMPTY", 'red'); return; }
+
+    w.ammo--;
+    gameState.lastFireTime = Date.now();
+    updateUI();
+    
+    // Leon firing animation for shotgun - play complete animation
+    if (currentCharacter === 'leon' && leonAnimator && gameState.currentWeapon === 'shotgun' && input.aim) {
+        leonAnimator.playAnimation(LEON_ANIMATIONS.shotgun_fire, false);
+        // Return to aim after fire animation completes
+        setTimeout(() => {
+            if (input.aim && leonAnimator) {
+                leonAnimator.playAnimation(LEON_ANIMATIONS.shotgun_aim, true);
+            }
+        }, 800); // Adjust timing based on animation length
+    }
+
+    const count = cfg.pellets || 1;
+    for(let i=0; i<count; i++) {
+        spawnBullet(); // Visual effect
+        performHitscan(); // Instant damage
+    }
+}
+
+function performHitscan() {
+    // INSTANT hit detection from crosshair
+    const raycaster = new THREE.Raycaster();
+    const screenCenter = new THREE.Vector2(0, 0);
+    raycaster.setFromCamera(screenCenter, camera);
+    
+    // Apply spread
+    const spread = WEAPONS[gameState.currentWeapon].spread || 0;
+    if (spread > 0) {
+        const spreadX = (Math.random() - 0.5) * spread;
+        const spreadY = (Math.random() - 0.5) * spread;
+        const originalDir = raycaster.ray.direction.clone();
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(originalDir, up).normalize();
+        const actualUp = new THREE.Vector3().crossVectors(right, originalDir).normalize();
+        
+        raycaster.ray.direction.add(right.multiplyScalar(spreadX));
+        raycaster.ray.direction.add(actualUp.multiplyScalar(spreadY));
+        raycaster.ray.direction.normalize();
+    }
+    
+    const weapon = WEAPONS[gameState.currentWeapon];
+    let closestHit = null;
+    let closestDistance = Infinity;
+    
+    // Check what the crosshair is pointing at
+    enemies.forEach(e => {
+        let isHeadshot = false;
+        let hitDistance = 0;
+        let didHit = false;
+        
+        // Check headshot first (smaller hitbox, higher priority)
+        if (e.head) {
+            const headWorldPos = new THREE.Vector3();
+            e.head.getWorldPosition(headWorldPos);
+            const rayToHead = headWorldPos.clone().sub(raycaster.ray.origin);
+            hitDistance = rayToHead.dot(raycaster.ray.direction);
+            
+            if (hitDistance > 0) { // In front of camera
+                const closestPoint = raycaster.ray.origin.clone().add(
+                    raycaster.ray.direction.clone().multiplyScalar(hitDistance)
+                );
+                const distToHead = closestPoint.distanceTo(headWorldPos);
+                
+                if (distToHead < 0.35) { // Head hitbox radius
+                    isHeadshot = true;
+                    didHit = true;
+                }
+            }
+        }
+        
+        // Check body hit if no headshot
+        if (!didHit) {
+            const bodyPos = e.group.position.clone().add(new THREE.Vector3(0, 1.0, 0));
+            const rayToBody = bodyPos.clone().sub(raycaster.ray.origin);
+            hitDistance = rayToBody.dot(raycaster.ray.direction);
+            
+            if (hitDistance > 0) { // In front of camera
+                const closestPoint = raycaster.ray.origin.clone().add(
+                    raycaster.ray.direction.clone().multiplyScalar(hitDistance)
+                );
+                const distToBody = closestPoint.distanceTo(bodyPos);
+                
+                if (distToBody < 0.6) { // Body hitbox radius
+                    didHit = true;
+                }
+            }
+        }
+        
+        if (!didHit) return;
+        
+        // Track closest hit (in case multiple enemies overlap)
+        if (hitDistance < closestDistance) {
+            closestDistance = hitDistance;
+            
+            // Calculate damage with falloff
+            let damage = weapon.damageClose || weapon.damage || 0;
+            
+            if (weapon.falloffStart && weapon.falloffEnd) {
+                if (hitDistance < weapon.falloffStart) {
+                    damage = weapon.damageClose;
+                } else if (hitDistance > weapon.falloffEnd) {
+                    damage = weapon.damageFar;
+                } else {
+                    // Interpolate between close and far damage
+                    const falloffRatio = (hitDistance - weapon.falloffStart) / (weapon.falloffEnd - weapon.falloffStart);
+                    damage = weapon.damageClose + (weapon.damageFar - weapon.damageClose) * falloffRatio;
+                }
+            }
+            
+            // Apply headshot multiplier
+            if (isHeadshot) {
+                damage *= 2;
+            }
+            
+            closestHit = { enemy: e, damage: Math.round(damage), isHeadshot };
+        }
+    });
+    
+    // Apply damage to closest hit only
+    if (closestHit) {
+        damageEnemy(closestHit.enemy, closestHit.damage, closestHit.isHeadshot);
+    }
+}
+
+function spawnBullet() {
+    // 1. RAYCAST from screen center (where crosshair is) to find target point
+    const raycaster = new THREE.Raycaster();
+    const screenCenter = new THREE.Vector2(0, 0);
+    raycaster.setFromCamera(screenCenter, camera);
+    
+    // Find a point far away where the crosshair is aiming
+    const targetPoint = raycaster.ray.at(100, new THREE.Vector3());
+    
+    // 2. Find Origin (Gun Muzzle) - offset from player position
+    const origin = player.position.clone().add(new THREE.Vector3(0, 1.4, 0)); 
+    // Add forward/right offset based on rotation to match visual arm
+    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(player.quaternion);
+    const right = new THREE.Vector3(-1, 0, 0).applyQuaternion(player.quaternion);
+    origin.add(forward.multiplyScalar(0.5)).add(right.multiplyScalar(0.2));
+
+    // 3. Calculate direction from MUZZLE to TARGET POINT (where crosshair points)
+    const bulletDir = new THREE.Vector3().subVectors(targetPoint, origin).normalize();
+
+    // 4. Apply Spread
+    const spread = WEAPONS[gameState.currentWeapon].spread || 0;
+    if (spread > 0) {
+        const spreadX = (Math.random() - 0.5) * spread;
+        const spreadY = (Math.random() - 0.5) * spread;
+        const spreadZ = (Math.random() - 0.5) * spread;
+        bulletDir.x += spreadX;
+        bulletDir.y += spreadY;
+        bulletDir.z += spreadZ;
+        bulletDir.normalize();
+    }
+
+    // 5. Spawn Bullet
+    const b = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.05, 0.2),
+        new THREE.MeshBasicMaterial({ color: 0xffff00 })
+    );
+    b.position.copy(origin);
+    b.userData.velocity = bulletDir.clone().multiplyScalar(300); // Much faster - nearly instant
+    b.lookAt(origin.clone().add(bulletDir));
+    
+    scene.add(b);
+    bullets.push(b);
+}
+
+function updateBullets(dt) {
+    for (let i = bullets.length-1; i>=0; i--) {
+        const b = bullets[i];
+        b.position.add(b.userData.velocity.clone().multiplyScalar(dt));
+        
+        // Bullets are now just visual - remove after traveling far or timeout
+        if (b.position.distanceTo(player.position) > 100) {
+            scene.remove(b);
+            bullets.splice(i, 1);
+        }
+    }
+}
+
+function performMelee() {
+    // Leon animation for knife - play complete stab animation
+    if (currentCharacter === 'leon' && leonAnimator) {
+        const stabAnim = getNextStabAnimation();
+        leonAnimator.playAnimation(stabAnim, false);
+        
+        // Return to knife idle after stab completes
+        setTimeout(() => {
+            if (leonAnimator && gameState.currentWeapon === 'knife') {
+                leonAnimator.playAnimation(LEON_ANIMATIONS.knife_idle, true);
+            }
+        }, 600); // Adjust timing based on animation length
+    }
+    
+    // Block model animation
+    const arm = player.getObjectByName('RightArm');
+    if (arm) {
+        arm.rotation.x = -Math.PI / 2;
+        setTimeout(() => { arm.rotation.x = 0; }, 200);
+    }
+    
+    setTimeout(() => {
+        enemies.forEach(e => {
+            const dist = e.group.position.distanceTo(player.position);
+            const angle = player.getWorldDirection(new THREE.Vector3()).dot(
+                new THREE.Vector3().subVectors(e.group.position, player.position).normalize()
+            );
+            if (dist < 2.5 && angle > 0.5) damageEnemy(e, WEAPONS.knife.damage);
+        });
+    }, 100);
+}
+
+function damageEnemy(e, amt, isHeadshot = false) {
+    e.hp -= amt;
+    
+    // Visual feedback
+    const flashColor = isHeadshot ? 0xffff00 : 0xff0000;
+    e.group.children.forEach(c => { if(c.material) c.material.emissive.setHex(flashColor); });
+    setTimeout(() => { e.group.children.forEach(c => { if(c.material) c.material.emissive.setHex(0); }); }, 100);
+    
+    if (e.hp <= 0) {
+        const deathPos = e.group.position.clone();
+        scene.remove(e.group);
+        enemies = enemies.filter(z => z !== e);
+        gameState.enemiesAlive--;
+        
+        // 20% chance to drop something
+        if (Math.random() < 0.20) {
+            const dropRoll = Math.random();
+            let dropType;
+            // 40% handgun, 40% shotgun, 20% herb
+            if (dropRoll < 0.4) dropType = 'handgun_ammo';
+            else if (dropRoll < 0.8) dropType = 'shotgun_ammo';
+            else dropType = 'herb';
+            
+            setTimeout(() => createPickup(dropType, deathPos), 200);
+        }
+        
+        if (gameState.enemiesAlive === 0 && gameState.enemiesSpawned >= gameState.enemiesToSpawn) {
+            startRound(gameState.round + 1);
+        }
+    }
+}
+
+function startReload() {
+    const w = gameState.weaponStates[gameState.currentWeapon];
+    const cfg = WEAPONS[gameState.currentWeapon];
+    if (gameState.currentWeapon === 'knife' || w.ammo >= cfg.magSize || w.reserve <= 0) return;
+    
+    gameState.isReloading = true;
+    updateUI(); // Update UI to show reloading status
+    
+    // Leon reload animation
+    if (currentCharacter === 'leon' && leonAnimator) {
+        leonAnimator.playAnimation(LEON_ANIMATIONS.reload, false);
+    }
+    
+    setTimeout(() => {
+        const needed = cfg.magSize - w.ammo;
+        const take = Math.min(needed, w.reserve);
+        w.ammo += take;
+        w.reserve -= take;
+        gameState.isReloading = false;
+        updateUI();
+        
+        // Return to idle animation
+        if (currentCharacter === 'leon' && leonAnimator) {
+            leonAnimator.playAnimation(getLeonIdleAnimation(), true);
+        }
+    }, cfg.reloadTime);
+}
+
+function performQuickTurn() {
+    if (gameState.isQuickTurning) return;
+    gameState.isQuickTurning = true;
+    gameState.quickTurnTimer = 0;
+    gameState.quickTurnStartRot = player.rotation.y;
+    gameState.quickTurnTargetRot = player.rotation.y + Math.PI; // 180 degrees
+}
+
+function startRound(r) {
+    gameState.round = r;
+    gameState.enemiesToSpawn = 3 + r;
+    gameState.enemiesSpawned = 0;
+    gameState.enemiesAlive = 0;
+    showMessage(`ROUND ${r}`);
+    setTimeout(() => showMessage(""), 2000);
+}
+
+function spawnEnemy() {
+    if (gameState.enemiesSpawned >= gameState.enemiesToSpawn) return;
+    const enemy = createBlockZombie();
+    const angle = Math.random() * Math.PI * 2;
+    enemy.position.set(Math.sin(angle)*20, 0, Math.cos(angle)*20);
+    scene.add(enemy);
+    
+    // Store reference to head for headshot detection
+    const head = enemy.children.find(c => c.geometry && c.position.y > 1.5);
+    enemies.push({ 
+        group: enemy, 
+        head: head,
+        hp: 100 + (gameState.round*20) 
+    });
+    gameState.enemiesSpawned++;
+    gameState.enemiesAlive++;
+}
+
+function updateEnemies(dt) {
+    if (Date.now() - gameState.lastSpawnTime > 2000) { spawnEnemy(); gameState.lastSpawnTime = Date.now(); }
+    enemies.forEach(e => {
+        const dir = new THREE.Vector3().subVectors(player.position, e.group.position).normalize();
+        e.group.position.add(dir.multiplyScalar(1.5 * dt)); 
+        e.group.lookAt(player.position);
+        if (e.group.position.distanceTo(player.position) < 1.0) {
+            if (Date.now() - gameState.lastHitTime > CONFIG.INVINCIBILITY_TIME) {
+                gameState.hp -= 15;
+                gameState.lastHitTime = Date.now();
+                updateUI();
+                
+                // Player hit animations and knockback (when damaged but not dead)
+                if (gameState.hp > 0 && currentCharacter === 'leon' && leonAnimator) {
+                    let hitAnim;
+                    if (gameState.currentWeapon === 'knife') {
+                        hitAnim = LEON_ANIMATIONS.pistol_hit;
+                    } else if (gameState.currentWeapon === 'shotgun') {
+                        hitAnim = LEON_ANIMATIONS.pistol_hit2;
+                    } else {
+                        // Pistol or other weapons - randomly choose hit1 or hit2
+                        hitAnim = Math.random() < 0.5 ? LEON_ANIMATIONS.pistol_hit : LEON_ANIMATIONS.pistol_hit2;
+                    }
+                    
+                    // Play hit animation completely
+                    leonAnimator.playAnimation(hitAnim, false);
+                    
+                    // Move player back 1 foot (0.3048 meters)
+                    const knockbackDir = new THREE.Vector3().subVectors(player.position, e.group.position).normalize();
+                    player.position.add(knockbackDir.multiplyScalar(0.3));
+                    
+                    // Return to appropriate idle after hit animation
+                    setTimeout(() => {
+                        if (leonAnimator && gameState.hp > 0) {
+                            leonAnimator.playAnimation(getLeonIdleAnimation(), true);
+                        }
+                    }, 500);
+                }
+                
+                if (gameState.hp <= 0) {
+                    gameState.isDead = true;
+                    
+                    // Leon death animation based on equipped weapon - keep frozen on ground
+                    if (currentCharacter === 'leon' && leonAnimator) {
+                        let deathAnim;
+                        if (gameState.currentWeapon === 'knife') {
+                            deathAnim = LEON_ANIMATIONS.knife_death;
+                        } else if (gameState.currentWeapon === 'shotgun') {
+                            deathAnim = LEON_ANIMATIONS.shotgun_death;
+                        } else {
+                            // Pistol - use pistol_death
+                            deathAnim = LEON_ANIMATIONS.pistol_death;
+                        }
+                        
+                        const action = leonAnimator.playAnimation(deathAnim, false);
+                        if (action) {
+                            action.clampWhenFinished = true; // Freeze on last frame
+                        }
+                    }
+                    
+                    document.getElementById('game-over-screen').style.display = 'block';
+                }
+            }
+        }
+    });
+}
+
+// --- PICKUP SYSTEM ---
+function createPickup(type, position) {
+    const group = new THREE.Group();
+    
+    let color, label;
+    switch(type) {
+        case 'handgun_ammo':
+            color = 0xffaa00;
+            label = 'PISTOL';
+            break;
+        case 'shotgun_ammo':
+            color = 0xff4444;
+            label = 'SHOTGUN';
+            break;
+        case 'herb':
+            color = 0x44ff44;
+            label = 'HERB';
+            break;
+    }
+    
+    // Visual representation
+    const box = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.4, 0.4),
+        new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.3 })
+    );
+    box.position.y = 0.2;
+    group.add(box);
+    
+    group.position.copy(position);
+    group.userData.type = type;
+    group.userData.rotationSpeed = 2;
+    
+    scene.add(group);
+    pickups.push(group);
+}
+
+function updatePickups(dt) {
+    for (let i = pickups.length - 1; i >= 0; i--) {
+        const pickup = pickups[i];
+        
+        // Rotate pickup for visual effect
+        pickup.rotation.y += pickup.userData.rotationSpeed * dt;
+        pickup.children[0].position.y = 0.2 + Math.sin(Date.now() * 0.003) * 0.1;
+        
+        // Check collision with player
+        const dist = pickup.position.distanceTo(player.position);
+        if (dist < 1.5) {
+            collectPickup(pickup.userData.type);
+            scene.remove(pickup);
+            pickups.splice(i, 1);
+        }
+    }
+}
+
+function collectPickup(type) {
+    switch(type) {
+        case 'handgun_ammo':
+            gameState.weaponStates.pistol.reserve += 15;
+            showMessage("HANDGUN AMMO +15", '#ffaa00');
+            setTimeout(() => showMessage(""), 1000);
+            break;
+        case 'shotgun_ammo':
+            gameState.weaponStates.shotgun.reserve += 8;
+            showMessage("SHOTGUN AMMO +8", '#ff4444');
+            setTimeout(() => showMessage(""), 1000);
+            break;
+        case 'herb':
+            const herbItem = inventory.find(item => item.type === 'herb');
+            if (herbItem) {
+                herbItem.amount++;
+            } else {
+                inventory.push({ type: 'herb', amount: 1 });
+            }
+            showMessage("HERB +1", '#44ff44');
+            setTimeout(() => showMessage(""), 1000);
+            break;
+    }
+    updateUI();
+}
+
+function spawnRandomPickup() {
+    const types = ['handgun_ammo', 'shotgun_ammo', 'herb'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 10 + Math.random() * 15;
+    const position = new THREE.Vector3(
+        Math.sin(angle) * distance,
+        0,
+        Math.cos(angle) * distance
+    );
+    createPickup(type, position);
+}
+
+function updateCamera() {
+    if (!player) return;
+
+    // Camera offsets adjusted for each character
+    let xOff = 0.8;
+    let yOff = 2.5; 
+    let zOff = -3.5;
+    let aimX = 1.0;
+    let aimY = 1.8;
+    let aimZ = -1.2;
+    
+    // Leon (model-based) needs adjusted offsets
+    if (currentCharacter === 'leon') {
+        xOff = 0.9;
+        yOff = 2.3;
+        zOff = -4.0;
+        aimX = 1.1;
+        aimY = 1.9;
+        aimZ = -1.3;
+    }
+
+    const currentX = input.aim ? aimX : xOff;
+    const currentY = input.aim ? aimY : yOff;
+    const currentZ = input.aim ? aimZ : zOff;
+
+    const offset = new THREE.Vector3(currentX, currentY, currentZ);
+    offset.applyQuaternion(player.quaternion);
+    
+    // Smooth Camera Follow
+    const targetPos = player.position.clone().add(offset);
+    camera.position.lerp(targetPos, 0.15);
+
+    // Camera Look Direction
+    if (input.aim) {
+        // When aiming: Camera looks in direction of player rotation + pitch offset
+        // This ensures crosshair points where bullets will go
+        const lookDistance = 20;
+        
+        // Create direction vector based on player's Y rotation and camera pitch
+        const direction = new THREE.Vector3();
+        direction.x = Math.sin(player.rotation.y) * Math.cos(cameraPitch);
+        direction.y = Math.sin(cameraPitch);
+        direction.z = Math.cos(player.rotation.y) * Math.cos(cameraPitch);
+        direction.normalize();
+        
+        const lookAt = camera.position.clone().add(direction.multiplyScalar(lookDistance));
+        camera.lookAt(lookAt);
+    } else {
+        // When not aiming: Camera follows player's forward direction
+        const lookDist = 5;
+        const lookHeight = 1.5;
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(player.quaternion);
+        const lookAt = player.position.clone().add(new THREE.Vector3(0, lookHeight, 0)).add(forward.multiplyScalar(lookDist));
+        camera.lookAt(lookAt);
+    }
+}
+
+// --- UI HELPERS ---
+function updateUI() {
+    const w = gameState.weaponStates[gameState.currentWeapon];
+    const ammoText = gameState.isReloading ? 'RELOADING...' : `${w.ammo}/${w.reserve}`;
+    document.getElementById('ammo-count').innerText = ammoText;
+    document.getElementById('ammo-count').style.color = gameState.isReloading ? '#ffff00' : '#ffffff';
+    document.getElementById('weapon-name').innerText = gameState.currentWeapon.toUpperCase();
+    document.getElementById('round-hud').innerText = `ROUND: ${gameState.round}`;
+    
+    // Resident Evil style health system
+    const hpEl = document.getElementById('hp-text');
+    const healthPercentage = gameState.hp / gameState.maxHp;
+    
+    if (healthPercentage > 0.66) {
+        hpEl.innerText = "FINE";
+        hpEl.style.color = "#0f0"; // Green
+    } else if (healthPercentage > 0.33) {
+        hpEl.innerText = "CAUTION";
+        hpEl.style.color = "#ff0"; // Yellow
+    } else {
+        hpEl.innerText = "DANGER";
+        hpEl.style.color = "#f00"; // Red
+    }
+}
+
+function showMessage(txt, col='#0f0') {
+    const el = document.getElementById('center-msg');
+    el.innerText = txt;
+    el.style.color = col;
+    el.style.display = txt ? 'block' : 'none';
+}
+
+function toggleInventory() {
+    inventoryOpen = !inventoryOpen;
+    document.getElementById('inventory-panel').style.display = inventoryOpen ? 'block' : 'none';
+    gameState.isPaused = inventoryOpen;
+    if (inventoryOpen) updateInventoryDisplay();
+}
+
+function updateInventoryDisplay() {
+    const grid = document.getElementById('inventory-grid');
+    grid.innerHTML = '';
+    inventory.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'inventory-slot';
+        if (item.type === 'weapon') {
+            div.innerText = item.id.toUpperCase();
+            if(item.id === gameState.currentWeapon) div.style.border = '2px solid white';
+            div.onclick = () => { equipWeapon(item.id); toggleInventory(); };
+        } else {
+            div.innerText = `HERB x${item.amount}`;
+            div.onclick = () => { 
+                if(gameState.hp < gameState.maxHp) {
+                    gameState.hp = Math.min(gameState.maxHp, gameState.hp+50);
+                    item.amount--;
+                    if(item.amount<=0) inventory.splice(i,1);
+                    updateUI(); toggleInventory();
+                }
+            };
+        }
+        grid.appendChild(div);
+    });
+}
+
+function togglePause() {
+    gameState.isPaused = !gameState.isPaused;
+    document.getElementById('pause-menu').style.display = gameState.isPaused ? 'flex' : 'none';
+}
+
+function onKey(e, down) {
+    if (e.code === 'KeyW') input.w = down;
+    if (e.code === 'KeyS') input.s = down;
+    if (e.code === 'KeyA') input.a = down;
+    if (e.code === 'KeyD') input.d = down;
+    if (e.code === 'KeyM') input.m = down;
+    if (e.code.includes('Shift')) input.shift = down;
+    if (down) {
+        if (e.code === 'KeyQ') performQuickTurn();
+        if (e.code === 'KeyR') startReload();
+        if (e.code === 'KeyI') toggleInventory();
+        if (e.code === 'KeyP') togglePause();
+    }
+}
+
+function onMouse(e, down) {
+    if (e.button === 2) { 
+        input.aim = down; 
+        if(!inventoryOpen) document.getElementById('crosshair').style.display = down ? 'block' : 'none';
+    }
+    if (e.button === 0) input.fire = down;
+}
+
+function onMouseMove(e) {
+    // Capture mouse movement for aiming
+    if (!gameState.isPaused && !inventoryOpen && input.aim) {
+        input.mouseX = e.movementX;
+        input.mouseY = e.movementY;
+    }
+}
+
+function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    update(clock.getDelta());
+    renderer.render(scene, camera);
+}
