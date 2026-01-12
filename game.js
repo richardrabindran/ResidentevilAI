@@ -1521,26 +1521,59 @@ function update(dt) {
     }
 
     // 3. TANK CONTROLS MOVEMENT (RE4 Style)
-    // Player cannot move while aiming or reloading
+    // Player cannot move while aiming or reloading (except Hunk can move while aiming/reloading)
     let isMoving = false;
     let moveDirection = 'idle'; // idle, forward, backward, run
     
-    if (!input.aim && !gameState.isReloading && !gameState.isDancing) {
+    const canMoveWhileAiming = currentCharacter === 'hunk';
+    const canMoveWhileReloading = currentCharacter === 'hunk';
+    const isAimingRestricted = input.aim && !canMoveWhileAiming;
+    const isReloadingRestricted = gameState.isReloading && !canMoveWhileReloading;
+    
+    if (!isAimingRestricted && !isReloadingRestricted && !gameState.isDancing) {
         const charSpeed = CHARACTERS[currentCharacter].speed;
         
-        // A = Rotate LEFT (Tank Controls)
+        // A = Rotate LEFT (Tank Controls) / Strafe LEFT (Hunk while aiming)
         if (input.a) {
-            player.rotation.y += CONFIG.ROTATION_SPEED * dt;
+            if (input.aim && canMoveWhileAiming) {
+                // Hunk strafes left while aiming
+                let strafeSpeed = charSpeed * 0.4 * dt; // Strafe is slower than forward movement
+                player.translateX(strafeSpeed);
+                isMoving = true;
+                moveDirection = 'forward';
+            } else {
+                // Normal rotation for Leon/Claire or Hunk not aiming
+                player.rotation.y += CONFIG.ROTATION_SPEED * dt;
+            }
         }
         
-        // D = Rotate RIGHT (Tank Controls)
+        // D = Rotate RIGHT (Tank Controls) / Strafe RIGHT (Hunk while aiming)
         if (input.d) {
-            player.rotation.y -= CONFIG.ROTATION_SPEED * dt;
+            if (input.aim && canMoveWhileAiming) {
+                // Hunk strafes right while aiming
+                let strafeSpeed = charSpeed * 0.4 * dt; // Strafe is slower than forward movement
+                player.translateX(-strafeSpeed);
+                isMoving = true;
+                moveDirection = 'forward';
+            } else {
+                // Normal rotation for Leon/Claire or Hunk not aiming
+                player.rotation.y -= CONFIG.ROTATION_SPEED * dt;
+            }
         }
         
         // W = Forward (can run with SHIFT)
         if (input.w) {
-            const moveSpeed = input.shift ? (charSpeed * CONFIG.SPRINT_MULTIPLIER * dt) : (charSpeed * dt);
+            let moveSpeed = charSpeed * dt;
+            
+            // Apply speed modifiers
+            if (input.aim && canMoveWhileAiming) {
+                moveSpeed *= 0.7; // 70% speed while aiming for Hunk
+            }
+            if (gameState.isReloading && canMoveWhileReloading) {
+                moveSpeed *= 0.7; // 70% speed while reloading for Hunk
+            }
+            
+            moveSpeed = input.shift ? (moveSpeed * CONFIG.SPRINT_MULTIPLIER) : moveSpeed;
             player.translateZ(moveSpeed);
             isMoving = true;
             moveDirection = input.shift ? 'run' : 'forward';
@@ -1548,7 +1581,16 @@ function update(dt) {
         
         // S = Backward (walk only, no running)
         if (input.s) {
-            const backSpeed = charSpeed * 0.6 * dt;
+            let backSpeed = charSpeed * 0.6 * dt;
+            
+            // Apply speed modifiers
+            if (input.aim && canMoveWhileAiming) {
+                backSpeed *= 0.7; // 70% speed while aiming for Hunk
+            }
+            if (gameState.isReloading && canMoveWhileReloading) {
+                backSpeed *= 0.7; // 70% speed while reloading for Hunk
+            }
+            
             player.translateZ(-backSpeed);
             isMoving = true;
             moveDirection = 'backward';
