@@ -2,8 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>RE 1.5 - Browser Edition</title>
+    <title>Battle Coliseum</title>
     <link rel="stylesheet" href="style.css">
+    
+    <!-- Background Music -->
+    <audio id="menu-music" loop preload="auto">
+        <source src="assets/audio/menu/menu.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="leon-music" loop preload="auto">
+        <source src="assets/audio/leon/leon.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="claire-music" loop preload="auto">
+        <source src="assets/audio/claire/claire.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="hunk-music" loop preload="auto">
+        <source src="assets/audio/hunk/hunk.mp3" type="audio/mpeg">
+    </audio>
+    
+    <!-- Sound Effects -->
+    <audio id="dead-sound" preload="auto">
+        <source src="assets/audio/dead/dead.mp3" type="audio/mpeg">
+    </audio>
 </head>
 <body>
 
@@ -14,7 +33,7 @@
 </div>
 
 <div id="menu-layer">
-    <h1 class="title-text">RESIDENT EVIL: WEB</h1>
+    <h1 class="title-text">BATTLE COLISEUM</h1>
     <p>SELECT CHARACTER</p>
     <div class="char-select-container">
         <div class="char-card" id="btn-leon"><h3 style="color:#4466ff">LEON</h3>Stats: Balanced</div>

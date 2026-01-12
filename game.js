@@ -117,6 +117,56 @@ const ZOMBIE_ANIMATIONS = {
     walk2: 'walk2'
 };
 
+// --- ZOMBIE3 ANIMATIONS MAPPING (Fast runner, 3 attacks) ---
+const ZOMBIE3_ANIMATIONS = {
+    attack1: 'attack1',
+    attack2: 'attack2',
+    attack3: 'attack3',
+    death1: 'death1',
+    death2: 'death2',
+    hit1: 'hit1',
+    hit2: 'hit2',
+    idle: 'idle',
+    run: 'run',
+    tpose: 'tpose'
+};
+
+// --- ZOMBIE4 ANIMATIONS MAPPING (Same as Zombie3) ---
+const ZOMBIE4_ANIMATIONS = {
+    attack1: 'attack1',
+    attack2: 'attack2',
+    attack3: 'attack3',
+    death1: 'death1',
+    death2: 'death2',
+    hit1: 'hit1',
+    hit2: 'hit2',
+    idle: 'idle',
+    run: 'run',
+    tpose: 'tpose'
+};
+
+// --- ZOMBIE5 ANIMATIONS MAPPING (Same as Zombie3) ---
+const ZOMBIE5_ANIMATIONS = {
+    attack1: 'attack1',
+    attack2: 'attack2',
+    attack3: 'attack3',
+    death1: 'death1',
+    death2: 'death2',
+    hit1: 'hit1',
+    hit2: 'hit2',
+    idle: 'idle',
+    run: 'run',
+    tpose: 'tpose'
+};
+
+// --- ZOMBIE6 ANIMATIONS MAPPING (Walker, single attack/death) ---
+const ZOMBIE6_ANIMATIONS = {
+    attack: 'attack',
+    death: 'death',
+    idle: 'idle',
+    walk: 'walk'
+};
+
 // --- LEON ANIMATIONS MAPPING ---
 const LEON_ANIMATIONS = {
     dance: 'dance',
@@ -237,7 +287,8 @@ class ZombieAnimator {
         }
         
         if (this.currentAction && this.currentAction !== action) {
-            this.currentAction.fadeOut(0.2);
+            this.currentAction.stop();
+            this.currentAction.fadeOut(0.1);
         }
         
         action.reset();
@@ -313,11 +364,54 @@ let gameState = {
     deathAnimationComplete: false
 };
 
+// Audio elements for music
+const menuMusic = document.getElementById('menu-music');
+const leonMusic = document.getElementById('leon-music');
+const claireMusic = document.getElementById('claire-music');
+const hunkMusic = document.getElementById('hunk-music');
+
+// Sound effects
+const deadSound = document.getElementById('dead-sound');
+
+// Set music volume levels (0.0 to 1.0)
+menuMusic.volume = 0.6;
+leonMusic.volume = 0.5;
+claireMusic.volume = 0.5;
+hunkMusic.volume = 0.5;
+deadSound.volume = 0.8;
+
+// Function to stop all music
+function stopAllMusic() {
+    menuMusic.pause();
+    leonMusic.pause();
+    claireMusic.pause();
+    hunkMusic.pause();
+    menuMusic.currentTime = 0;
+    leonMusic.currentTime = 0;
+    claireMusic.currentTime = 0;
+    hunkMusic.currentTime = 0;
+}
+
+// Function to play character-specific music
+function playCharacterMusic(character) {
+    stopAllMusic();
+    
+    if (character === 'leon') {
+        leonMusic.play().catch(err => console.log('Leon music autoplay blocked:', err));
+    } else if (character === 'claire') {
+        claireMusic.play().catch(err => console.log('Claire music autoplay blocked:', err));
+    } else if (character === 'hunk') {
+        hunkMusic.play().catch(err => console.log('Hunk music autoplay blocked:', err));
+    }
+}
+
 clock = new THREE.Clock();
 
 init();
 
 function init() {
+    // Play menu music on initialization
+    menuMusic.play().catch(err => console.log('Menu music autoplay blocked:', err));
     // 1. Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x111111);
@@ -715,6 +809,218 @@ async function loadZombie2Model() {
     });
 }
 
+// --- LOAD ZOMBIE3 MODEL (Fast runner) ---
+async function loadZombie3Model() {
+    return new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+        let timeoutId = setTimeout(() => {
+            reject(new Error('Zombie3 model loading timeout - check if assets/zombie/zombie3/zombie3.glb exists'));
+        }, 3000);
+        
+        loader.load(
+            'assets/zombie/zombie3/zombie3.glb',
+            (gltf) => {
+                clearTimeout(timeoutId);
+                const model = gltf.scene;
+                model.scale.set(0.765, 0.765, 0.765);
+                model.rotation.y = 0;
+                model.castShadow = true;
+                model.traverse(node => {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                    
+                    if (node.material) {
+                        const materials = Array.isArray(node.material) ? node.material : [node.material];
+                        materials.forEach(material => {
+                            if (material.transparent && material.opacity >= 1.0) {
+                                material.transparent = false;
+                                material.needsUpdate = true;
+                            }
+                            material.depthTest = true;
+                            material.depthWrite = true;
+                        });
+                    }
+                });
+                
+                model.animations = gltf.animations;
+                console.log('✓ Zombie3 model loaded successfully with', gltf.animations.length, 'animations:', gltf.animations.map(c => c.name));
+                
+                resolve(model);
+            },
+            (progress) => {
+                if (progress.total > 0) {
+                    console.log('Loading zombie3.glb:', Math.round((progress.loaded / progress.total) * 100) + '%');
+                }
+            },
+            (error) => {
+                clearTimeout(timeoutId);
+                console.error('❌ Failed to load Zombie3 model:', error.message || error);
+                console.error('   Tried to load from: assets/zombie/zombie3/zombie3.glb');
+                reject(error);
+            }
+        );
+    });
+}
+
+// --- LOAD ZOMBIE4 MODEL (Fast runner) ---
+async function loadZombie4Model() {
+    return new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+        let timeoutId = setTimeout(() => {
+            reject(new Error('Zombie4 model loading timeout - check if assets/zombie/zombie4/zombie4.glb exists'));
+        }, 3000);
+        
+        loader.load(
+            'assets/zombie/zombie4/zombie4.glb',
+            (gltf) => {
+                clearTimeout(timeoutId);
+                const model = gltf.scene;
+                model.scale.set(0.765, 0.765, 0.765);
+                model.rotation.y = 0;
+                model.castShadow = true;
+                model.traverse(node => {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                    
+                    if (node.material) {
+                        const materials = Array.isArray(node.material) ? node.material : [node.material];
+                        materials.forEach(material => {
+                            if (material.transparent && material.opacity >= 1.0) {
+                                material.transparent = false;
+                                material.needsUpdate = true;
+                            }
+                            material.depthTest = true;
+                            material.depthWrite = true;
+                        });
+                    }
+                });
+                
+                model.animations = gltf.animations;
+                console.log('✓ Zombie4 model loaded successfully with', gltf.animations.length, 'animations:', gltf.animations.map(c => c.name));
+                
+                resolve(model);
+            },
+            (progress) => {
+                if (progress.total > 0) {
+                    console.log('Loading zombie4.glb:', Math.round((progress.loaded / progress.total) * 100) + '%');
+                }
+            },
+            (error) => {
+                clearTimeout(timeoutId);
+                console.error('❌ Failed to load Zombie4 model:', error.message || error);
+                console.error('   Tried to load from: assets/zombie/zombie4/zombie4.glb');
+                reject(error);
+            }
+        );
+    });
+}
+
+// --- LOAD ZOMBIE5 MODEL (Fast runner) ---
+async function loadZombie5Model() {
+    return new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+        let timeoutId = setTimeout(() => {
+            reject(new Error('Zombie5 model loading timeout - check if assets/zombie/zombie5/zombie5.glb exists'));
+        }, 3000);
+        
+        loader.load(
+            'assets/zombie/zombie5/zombie5.glb',
+            (gltf) => {
+                clearTimeout(timeoutId);
+                const model = gltf.scene;
+                model.scale.set(0.765, 0.765, 0.765);
+                model.rotation.y = 0;
+                model.castShadow = true;
+                model.traverse(node => {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                    
+                    if (node.material) {
+                        const materials = Array.isArray(node.material) ? node.material : [node.material];
+                        materials.forEach(material => {
+                            if (material.transparent && material.opacity >= 1.0) {
+                                material.transparent = false;
+                                material.needsUpdate = true;
+                            }
+                            material.depthTest = true;
+                            material.depthWrite = true;
+                        });
+                    }
+                });
+                
+                model.animations = gltf.animations;
+                console.log('✓ Zombie5 model loaded successfully with', gltf.animations.length, 'animations:', gltf.animations.map(c => c.name));
+                
+                resolve(model);
+            },
+            (progress) => {
+                if (progress.total > 0) {
+                    console.log('Loading zombie5.glb:', Math.round((progress.loaded / progress.total) * 100) + '%');
+                }
+            },
+            (error) => {
+                clearTimeout(timeoutId);
+                console.error('❌ Failed to load Zombie5 model:', error.message || error);
+                console.error('   Tried to load from: assets/zombie/zombie5/zombie5.glb');
+                reject(error);
+            }
+        );
+    });
+}
+
+// --- LOAD ZOMBIE6 MODEL (Slow walker, bigger) ---
+async function loadZombie6Model() {
+    return new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+        let timeoutId = setTimeout(() => {
+            reject(new Error('Zombie6 model loading timeout - check if assets/zombie/zombie6/zombie6.glb exists'));
+        }, 3000);
+        
+        loader.load(
+            'assets/zombie/zombie6/zombie6.glb',
+            (gltf) => {
+                clearTimeout(timeoutId);
+                const model = gltf.scene;
+                model.scale.set(0.875, 0.875, 0.875); // Same scale as Z1/Z2
+                model.rotation.y = 0;
+                model.castShadow = true;
+                model.traverse(node => {
+                    node.castShadow = true;
+                    node.receiveShadow = true;
+                    
+                    if (node.material) {
+                        const materials = Array.isArray(node.material) ? node.material : [node.material];
+                        materials.forEach(material => {
+                            if (material.transparent && material.opacity >= 1.0) {
+                                material.transparent = false;
+                                material.needsUpdate = true;
+                            }
+                            material.depthTest = true;
+                            material.depthWrite = true;
+                        });
+                    }
+                });
+                
+                model.animations = gltf.animations;
+                console.log('✓ Zombie6 model loaded successfully with', gltf.animations.length, 'animations:', gltf.animations.map(c => c.name));
+                
+                resolve(model);
+            },
+            (progress) => {
+                if (progress.total > 0) {
+                    console.log('Loading zombie6.glb:', Math.round((progress.loaded / progress.total) * 100) + '%');
+                }
+            },
+            (error) => {
+                clearTimeout(timeoutId);
+                console.error('❌ Failed to load Zombie6 model:', error.message || error);
+                console.error('   Tried to load from: assets/zombie/zombie6/zombie6.glb');
+                reject(error);
+            }
+        );
+    });
+}
+
 function createBlockPlayer(color) {
     const group = new THREE.Group();
     
@@ -885,6 +1191,10 @@ function initializeCharacter(type) {
     document.getElementById('menu-layer').style.display = 'none';
     document.getElementById('ui-layer').style.display = 'block';
     gameState.isPlaying = true;
+    
+    // Play character-specific music
+    playCharacterMusic(type);
+    
     updateInventoryDisplay();
     updateUI();
 }
@@ -1674,13 +1984,23 @@ function damageEnemy(e, amt, isHeadshot = false) {
     
     // Play hit animation for model-based zombies
     if (e.hp > 0 && e.animator) {
-        const hitAnim = Math.random() < 0.5 ? ZOMBIE_ANIMATIONS.hit1 : ZOMBIE_ANIMATIONS.hit2;
+        let hitAnim;
+        
+        if (e.hitAnimations) {
+            // Use zombie-specific hit animations
+            const randomHit = Math.floor(Math.random() * e.hitAnimations.length);
+            hitAnim = e.hitAnimations[randomHit];
+        } else {
+            // Fallback for old zombies
+            hitAnim = Math.random() < 0.5 ? ZOMBIE_ANIMATIONS.hit1 : ZOMBIE_ANIMATIONS.hit2;
+        }
+        
         e.animator.playAnimation(hitAnim, false);
         
         setTimeout(() => {
             if (e.animator && !e.isLunging && e.hp > 0) {
-                e.animator.playAnimation(ZOMBIE_ANIMATIONS.idle, true);
-                e.lastAnimationName = ZOMBIE_ANIMATIONS.idle;
+                e.animator.playAnimation(e.idleAnimation || ZOMBIE_ANIMATIONS.idle, true);
+                e.lastAnimationName = e.idleAnimation || ZOMBIE_ANIMATIONS.idle;
             }
         }, 300);
     }
@@ -1700,7 +2020,20 @@ function damageEnemy(e, amt, isHeadshot = false) {
         
         // Play death animation for model-based zombies
         if (e.animator) {
-            const deathAnim = Math.random() < 0.5 ? ZOMBIE_ANIMATIONS.death1 : ZOMBIE_ANIMATIONS.death2;
+            let deathAnim;
+            
+            if (e.deathAnimations) {
+                // Use zombie-specific death animations (Z1/Z2/Z3/Z4/Z5)
+                const randomDeath = Math.floor(Math.random() * e.deathAnimations.length);
+                deathAnim = e.deathAnimations[randomDeath];
+            } else if (e.deathAnimation) {
+                // Use single death animation (Z6)
+                deathAnim = e.deathAnimation;
+            } else {
+                // Fallback
+                deathAnim = ZOMBIE_ANIMATIONS.death1;
+            }
+            
             const action = e.animator.playAnimation(deathAnim, false);
             if (action) {
                 action.clampWhenFinished = true;
@@ -1805,138 +2138,278 @@ function spawnEnemy() {
     // Increment counter immediately to prevent race condition
     gameState.enemiesSpawned++;
     
-    // Calculate fat zombie spawn rate: 1 per 5 rounds
-    const fatZombiesPerRound = Math.floor(gameState.round / 5) + 1;
-    const maxFatZombiesThisRound = fatZombiesPerRound;
-    const currentFatZombies = enemies.filter(e => e.isFat).length;
+    // Equal 20% chance for Z1-Z5
+    const spawnRoll = Math.random();
+    let zombieType;
     
-    // Spawn fat zombie if we haven't reached the limit for this round
-    const isFat = currentFatZombies < maxFatZombiesThisRound && Math.random() < 0.3;
+    if (spawnRoll < 0.20) zombieType = 1;
+    else if (spawnRoll < 0.40) zombieType = 2;
+    else if (spawnRoll < 0.60) zombieType = 3;
+    else if (spawnRoll < 0.80) zombieType = 4;
+    else zombieType = 5;
     
-    // Decide which model to spawn (50/50 for zombie1 vs zombie2, or block model)
-    const spawnModelChance = Math.random();
-    
-    if (CONFIG.USE_ZOMBIE1_MODELS && spawnModelChance < 0.5) {
-        // Spawn zombie1 model
-        loadZombie1Model().then(model => {
-            const angle = Math.random() * Math.PI * 2;
-            model.position.set(
-                Math.sin(angle) * 20,
-                0,
-                Math.cos(angle) * 20
-            );
-            scene.add(model);
-            
-            const animator = new ZombieAnimator(model);
-            const baseHp = isFat ? 200 : 100;
-            const zombieData = {
-                group: model,
-                head: model.children[0],
-                isFat: isFat,
-                hp: baseHp + (gameState.round * 20),
-                isLunging: false,
-                lungeTarget: null,
-                lungeSpeed: isFat ? 12 : 8,
-                lastLungeTime: 0,
-                animator: animator,
-                isModelBased: true,
-                lastAnimationName: null,
-                lastWalkVariation: Math.random() < 0.5 ? ZOMBIE_ANIMATIONS.walk1 : ZOMBIE_ANIMATIONS.walk2,
-                isDying: false
-            };
-            
-            enemies.push(zombieData);
-            gameState.enemiesAlive++;
-            animator.playAnimation(ZOMBIE_ANIMATIONS.idle, true);
-        }).catch(err => {
-            console.error('Failed to load zombie1 model, using block model:', err.message);
-            const blockEnemy = isFat ? createFatZombie() : createBlockZombie();
-            const angle = Math.random() * Math.PI * 2;
-            blockEnemy.position.set(Math.sin(angle) * 20, 0, Math.cos(angle) * 20);
-            scene.add(blockEnemy);
-            
-            const head = blockEnemy.children.find(c => c.geometry && c.position.y > 1.5);
-            const baseHp = isFat ? 200 : 100;
-            enemies.push({
-                group: blockEnemy,
-                head: head,
-                isFat: isFat,
-                hp: baseHp + (gameState.round * 20),
-                isLunging: false,
-                lungeTarget: null,
-                lungeSpeed: isFat ? 12 : 8,
-                lastLungeTime: 0,
-                animator: null,
-                isModelBased: false,
-                lastAnimationName: null,
-                lastWalkVariation: Math.random() < 0.5 ? ZOMBIE_ANIMATIONS.walk1 : ZOMBIE_ANIMATIONS.walk2,
-                isDying: false
-            });
-            gameState.enemiesAlive++;
-        });
-    } else if (CONFIG.USE_ZOMBIE1_MODELS && spawnModelChance < 1.0) {
-        // Spawn zombie2 model
-        loadZombie2Model().then(model => {
-            const angle = Math.random() * Math.PI * 2;
-            model.position.set(
-                Math.sin(angle) * 20,
-                0,
-                Math.cos(angle) * 20
-            );
-            scene.add(model);
-            
-            const animator = new ZombieAnimator(model);
-            const baseHp = isFat ? 200 : 100;
-            const zombieData = {
-                group: model,
-                head: model.children[0],
-                isFat: isFat,
-                hp: baseHp + (gameState.round * 20),
-                isLunging: false,
-                lungeTarget: null,
-                lungeSpeed: isFat ? 12 : 8,
-                lastLungeTime: 0,
-                animator: animator,
-                isModelBased: true,
-                lastAnimationName: null,
-                lastWalkVariation: Math.random() < 0.5 ? ZOMBIE_ANIMATIONS.walk1 : ZOMBIE_ANIMATIONS.walk2,
-                isDying: false
-            };
-            
-            enemies.push(zombieData);
-            gameState.enemiesAlive++;
-            animator.playAnimation(ZOMBIE_ANIMATIONS.idle, true);
-        }).catch(err => {
-            console.error('Failed to load zombie2 model, using block model:', err.message);
-            const blockEnemy = isFat ? createFatZombie() : createZombie2BlockModel();
-            const angle = Math.random() * Math.PI * 2;
-            blockEnemy.position.set(Math.sin(angle) * 20, 0, Math.cos(angle) * 20);
-            scene.add(blockEnemy);
-            
-            const head = blockEnemy.children.find(c => c.geometry && c.position.y > 1.5);
-            const baseHp = isFat ? 200 : 100;
-            enemies.push({
-                group: blockEnemy,
-                head: head,
-                isFat: isFat,
-                hp: baseHp + (gameState.round * 20),
-                isLunging: false,
-                lungeTarget: null,
-                lungeSpeed: isFat ? 12 : 8,
-                lastLungeTime: 0,
-                animator: null,
-                isModelBased: false,
-                lastAnimationName: null,
-                lastWalkVariation: Math.random() < 0.5 ? ZOMBIE_ANIMATIONS.walk1 : ZOMBIE_ANIMATIONS.walk2,
-                isDying: false
-            });
-            gameState.enemiesAlive++;
-        });
-    } else {
-        // Spawn block model (50% chance)
-        const blockEnemy = isFat ? createFatZombie() : createBlockZombie();
-        spawnBlockEnemy(blockEnemy, isFat);
+    // Z6 spawning: 1 per round (1-4), 2 per round (5-9), 3 per round (10-14), 4 per round (15-19), etc.
+    // Formula: Math.floor((gameState.round - 1) / 5) + 1
+    const z6SpawnCount = Math.floor((gameState.round - 1) / 5) + 1;
+    if (Math.random() < (z6SpawnCount / gameState.enemiesToSpawn)) {
+        zombieType = 6;
     }
+    
+    // Determine spawn location
+    const angle = Math.random() * Math.PI * 2;
+    const spawnPos = {
+        x: Math.sin(angle) * 20,
+        y: 0,
+        z: Math.cos(angle) * 20
+    };
+    
+    // Spawn the appropriate zombie type
+    if (zombieType === 1 && CONFIG.USE_ZOMBIE1_MODELS) {
+        spawnZombie1(spawnPos);
+    } else if (zombieType === 2 && CONFIG.USE_ZOMBIE1_MODELS) {
+        spawnZombie2(spawnPos);
+    } else if (zombieType === 3 && CONFIG.USE_ZOMBIE1_MODELS) {
+        spawnZombie3(spawnPos);
+    } else if (zombieType === 4 && CONFIG.USE_ZOMBIE1_MODELS) {
+        spawnZombie4(spawnPos);
+    } else if (zombieType === 5 && CONFIG.USE_ZOMBIE1_MODELS) {
+        spawnZombie5(spawnPos);
+    } else if (zombieType === 6 && CONFIG.USE_ZOMBIE1_MODELS) {
+        spawnZombie6(spawnPos);
+    } else {
+        // Fallback to block model
+        const blockEnemy = createBlockZombie();
+        spawnBlockEnemy(blockEnemy, false);
+    }
+}
+
+// --- SPAWN ZOMBIE1 (Standard) ---
+function spawnZombie1(spawnPos) {
+    loadZombie1Model().then(model => {
+        model.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+        scene.add(model);
+        
+        const animator = new ZombieAnimator(model);
+        const zombieData = {
+            group: model,
+            head: model.children[0],
+            hp: 100 + (gameState.round * 20),
+            speed: 2.0,
+            walkAnimations: [ZOMBIE_ANIMATIONS.walk1, ZOMBIE_ANIMATIONS.walk2],
+            attackAnimations: [ZOMBIE_ANIMATIONS.attack1, ZOMBIE_ANIMATIONS.attack2],
+            deathAnimations: [ZOMBIE_ANIMATIONS.death1, ZOMBIE_ANIMATIONS.death2],
+            hitAnimations: [ZOMBIE_ANIMATIONS.hit1, ZOMBIE_ANIMATIONS.hit2],
+            idleAnimation: ZOMBIE_ANIMATIONS.idle,
+            isLunging: false,
+            lungeTarget: null,
+            lungeSpeed: 8,
+            lastLungeTime: 0,
+            animator: animator,
+            isModelBased: true,
+            lastAnimationName: ZOMBIE_ANIMATIONS.walk1,
+            lastWalkVariation: 0,
+            lastWalkSwitchTime: 0,
+            isDying: false
+        };
+        
+        enemies.push(zombieData);
+        gameState.enemiesAlive++;
+        animator.playAnimation(ZOMBIE_ANIMATIONS.idle, true);
+    }).catch(err => {
+        console.error('Failed to load zombie1 model:', err.message);
+        const blockEnemy = createBlockZombie();
+        spawnBlockEnemy(blockEnemy, false);
+    });
+}
+
+// --- SPAWN ZOMBIE2 (Standard) ---
+function spawnZombie2(spawnPos) {
+    loadZombie2Model().then(model => {
+        model.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+        scene.add(model);
+        
+        const animator = new ZombieAnimator(model);
+        const zombieData = {
+            group: model,
+            head: model.children[0],
+            hp: 100 + (gameState.round * 20),
+            speed: 2.0,
+            walkAnimations: [ZOMBIE_ANIMATIONS.walk1, ZOMBIE_ANIMATIONS.walk2],
+            attackAnimations: [ZOMBIE_ANIMATIONS.attack1, ZOMBIE_ANIMATIONS.attack2],
+            deathAnimations: [ZOMBIE_ANIMATIONS.death1, ZOMBIE_ANIMATIONS.death2],
+            hitAnimations: [ZOMBIE_ANIMATIONS.hit1, ZOMBIE_ANIMATIONS.hit2],
+            idleAnimation: ZOMBIE_ANIMATIONS.idle,
+            isLunging: false,
+            lungeTarget: null,
+            lungeSpeed: 8,
+            lastLungeTime: 0,
+            animator: animator,
+            isModelBased: true,
+            lastAnimationName: ZOMBIE_ANIMATIONS.walk1,
+            lastWalkVariation: 0,
+            lastWalkSwitchTime: 0,
+            isDying: false
+        };
+        
+        enemies.push(zombieData);
+        gameState.enemiesAlive++;
+        animator.playAnimation(ZOMBIE_ANIMATIONS.idle, true);
+    }).catch(err => {
+        console.error('Failed to load zombie2 model:', err.message);
+        const blockEnemy = createZombie2BlockModel();
+        spawnBlockEnemy(blockEnemy, false);
+    });
+}
+
+// --- SPAWN ZOMBIE3 (Fast runner, less health) ---
+function spawnZombie3(spawnPos) {
+    loadZombie3Model().then(model => {
+        model.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+        scene.add(model);
+        
+        const animator = new ZombieAnimator(model);
+        const zombieData = {
+            group: model,
+            head: model.children[0],
+            hp: 60 + (gameState.round * 15), // Less health than Z1/Z2
+            speed: 2.5,
+            runAnimation: ZOMBIE3_ANIMATIONS.run,
+            attackAnimations: [ZOMBIE3_ANIMATIONS.attack1, ZOMBIE3_ANIMATIONS.attack2, ZOMBIE3_ANIMATIONS.attack3],
+            deathAnimations: [ZOMBIE3_ANIMATIONS.death1, ZOMBIE3_ANIMATIONS.death2],
+            hitAnimations: [ZOMBIE3_ANIMATIONS.hit1, ZOMBIE3_ANIMATIONS.hit2],
+            idleAnimation: ZOMBIE3_ANIMATIONS.idle,
+            isLunging: false,
+            lungeTarget: null,
+            lungeSpeed: 12, // Faster lunge
+            lastLungeTime: 0,
+            animator: animator,
+            isModelBased: true,
+            lastAnimationName: ZOMBIE3_ANIMATIONS.idle,
+            isDying: false,
+            zombieType: 3
+        };
+        
+        enemies.push(zombieData);
+        gameState.enemiesAlive++;
+        animator.playAnimation(ZOMBIE3_ANIMATIONS.idle, true);
+    }).catch(err => {
+        console.error('Failed to load zombie3 model:', err.message);
+        const blockEnemy = createBlockZombie();
+        spawnBlockEnemy(blockEnemy, false);
+    });
+}
+
+// --- SPAWN ZOMBIE4 (Fast runner, less health) ---
+function spawnZombie4(spawnPos) {
+    loadZombie4Model().then(model => {
+        model.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+        scene.add(model);
+        
+        const animator = new ZombieAnimator(model);
+        const zombieData = {
+            group: model,
+            head: model.children[0],
+            hp: 60 + (gameState.round * 15),
+            speed: 2.5,
+            runAnimation: ZOMBIE4_ANIMATIONS.run,
+            attackAnimations: [ZOMBIE4_ANIMATIONS.attack1, ZOMBIE4_ANIMATIONS.attack2, ZOMBIE4_ANIMATIONS.attack3],
+            deathAnimations: [ZOMBIE4_ANIMATIONS.death1, ZOMBIE4_ANIMATIONS.death2],
+            hitAnimations: [ZOMBIE4_ANIMATIONS.hit1, ZOMBIE4_ANIMATIONS.hit2],
+            idleAnimation: ZOMBIE4_ANIMATIONS.idle,
+            isLunging: false,
+            lungeTarget: null,
+            lungeSpeed: 12,
+            lastLungeTime: 0,
+            animator: animator,
+            isModelBased: true,
+            lastAnimationName: ZOMBIE4_ANIMATIONS.idle,
+            isDying: false,
+            zombieType: 4
+        };
+        
+        enemies.push(zombieData);
+        gameState.enemiesAlive++;
+        animator.playAnimation(ZOMBIE4_ANIMATIONS.idle, true);
+    }).catch(err => {
+        console.error('Failed to load zombie4 model:', err.message);
+        const blockEnemy = createBlockZombie();
+        spawnBlockEnemy(blockEnemy, false);
+    });
+}
+
+// --- SPAWN ZOMBIE5 (Fast runner, less health) ---
+function spawnZombie5(spawnPos) {
+    loadZombie5Model().then(model => {
+        model.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+        scene.add(model);
+        
+        const animator = new ZombieAnimator(model);
+        const zombieData = {
+            group: model,
+            head: model.children[0],
+            hp: 60 + (gameState.round * 15),
+            speed: 2.5,
+            runAnimation: ZOMBIE5_ANIMATIONS.run,
+            attackAnimations: [ZOMBIE5_ANIMATIONS.attack1, ZOMBIE5_ANIMATIONS.attack2, ZOMBIE5_ANIMATIONS.attack3],
+            deathAnimations: [ZOMBIE5_ANIMATIONS.death1, ZOMBIE5_ANIMATIONS.death2],
+            hitAnimations: [ZOMBIE5_ANIMATIONS.hit1, ZOMBIE5_ANIMATIONS.hit2],
+            idleAnimation: ZOMBIE5_ANIMATIONS.idle,
+            isLunging: false,
+            lungeTarget: null,
+            lungeSpeed: 12,
+            lastLungeTime: 0,
+            animator: animator,
+            isModelBased: true,
+            lastAnimationName: ZOMBIE5_ANIMATIONS.idle,
+            isDying: false,
+            zombieType: 5
+        };
+        
+        enemies.push(zombieData);
+        gameState.enemiesAlive++;
+        animator.playAnimation(ZOMBIE5_ANIMATIONS.idle, true);
+    }).catch(err => {
+        console.error('Failed to load zombie5 model:', err.message);
+        const blockEnemy = createBlockZombie();
+        spawnBlockEnemy(blockEnemy, false);
+    });
+}
+
+// --- SPAWN ZOMBIE6 (Slow walker, more health, bigger) ---
+function spawnZombie6(spawnPos) {
+    loadZombie6Model().then(model => {
+        model.position.set(spawnPos.x, spawnPos.y, spawnPos.z);
+        scene.add(model);
+        
+        const animator = new ZombieAnimator(model);
+        const zombieData = {
+            group: model,
+            head: model.children[0],
+            hp: 150 + (gameState.round * 25), // More health than Z1/Z2
+            speed: 2.5,
+            walkAnimation: ZOMBIE6_ANIMATIONS.walk,
+            attackAnimation: ZOMBIE6_ANIMATIONS.attack,
+            deathAnimation: ZOMBIE6_ANIMATIONS.death,
+            idleAnimation: ZOMBIE6_ANIMATIONS.idle,
+            isLunging: false,
+            lungeTarget: null,
+            lungeSpeed: 6, // Slower lunge
+            lastLungeTime: 0,
+            animator: animator,
+            isModelBased: true,
+            lastAnimationName: ZOMBIE6_ANIMATIONS.idle,
+            isDying: false,
+            zombieType: 6
+        };
+        
+        enemies.push(zombieData);
+        gameState.enemiesAlive++;
+        animator.playAnimation(ZOMBIE6_ANIMATIONS.idle, true);
+    }).catch(err => {
+        console.error('Failed to load zombie6 model:', err.message);
+        const blockEnemy = createFatZombie();
+        spawnBlockEnemy(blockEnemy, true);
+    });
 }
 
 function spawnBlockEnemy(enemy, isFat) {
@@ -1985,7 +2458,20 @@ function updateEnemies(dt) {
             
             // Play attack animation for model-based zombies
             if (e.animator) {
-                const attackAnim = Math.random() < 0.5 ? ZOMBIE_ANIMATIONS.attack1 : ZOMBIE_ANIMATIONS.attack2;
+                let attackAnim;
+                
+                if (e.zombieType === 3 || e.zombieType === 4 || e.zombieType === 5) {
+                    // Zombie3/4/5: 3 attack animations
+                    const randomAttack = Math.floor(Math.random() * 3);
+                    attackAnim = e.attackAnimations[randomAttack];
+                } else if (e.zombieType === 6) {
+                    // Zombie6: 1 attack animation
+                    attackAnim = e.attackAnimation;
+                } else {
+                    // Zombie1/2: 2 attack animations
+                    attackAnim = Math.random() < 0.5 ? e.attackAnimations[0] : e.attackAnimations[1];
+                }
+                
                 e.animator.playAnimation(attackAnim, false);
             }
             
@@ -1993,26 +2479,42 @@ function updateEnemies(dt) {
                 e.isLunging = false;
                 // Return to idle after lunge
                 if (e.animator) {
-                    e.animator.playAnimation(ZOMBIE_ANIMATIONS.idle, true);
+                    e.animator.playAnimation(e.idleAnimation, true);
                 }
             }, 500);
         }
         
         // Handle lunging movement
-        if (e.isLunging && e.lungeTarget) {
+        if (e.isLunging && e.lungeTarget && !e.isDying) {
             const lungeDir = new THREE.Vector3().subVectors(e.lungeTarget, e.group.position).normalize();
             e.group.position.add(lungeDir.multiplyScalar(e.lungeSpeed * dt));
         } else if (!e.isDying) {
             // Normal walking behavior
             const dir = new THREE.Vector3().subVectors(player.position, e.group.position).normalize();
-            e.group.position.add(dir.multiplyScalar(1.5 * dt));
+            e.group.position.add(dir.multiplyScalar(e.speed * dt));
             
-            // Update walk animation for model-based zombies
+            // Update walk/run animation for model-based zombies
             if (e.animator) {
-                const walkAnim = e.lastWalkVariation;
-                if (walkAnim !== e.lastAnimationName && !e.isLunging) {
-                    e.animator.playAnimation(walkAnim, true);
-                    e.lastAnimationName = walkAnim;
+                let targetAnim;
+                
+                if (e.zombieType === 3 || e.zombieType === 4 || e.zombieType === 5) {
+                    // Zombie3/4/5: Use run animation (they run instead of walk)
+                    targetAnim = e.runAnimation;
+                } else if (e.zombieType === 6) {
+                    // Zombie6: Use walk animation
+                    targetAnim = e.walkAnimation;
+                } else {
+                    // Zombie1/2: Alternate between walk1 and walk2 (switch every 2-3 seconds)
+                    if (Date.now() - e.lastWalkSwitchTime > 2000 + Math.random() * 1000) {
+                        e.lastWalkVariation = e.lastWalkVariation === 0 ? 1 : 0;
+                        e.lastWalkSwitchTime = Date.now();
+                    }
+                    targetAnim = e.walkAnimations[e.lastWalkVariation];
+                }
+                
+                if (targetAnim !== e.lastAnimationName && !e.isLunging) {
+                    e.animator.playAnimation(targetAnim, true);
+                    e.lastAnimationName = targetAnim;
                 }
             }
         }
@@ -2129,6 +2631,19 @@ function updateEnemies(dt) {
                     }
                     
                     document.getElementById('game-over-screen').style.display = 'block';
+                    
+                    // Stop gameplay music
+                    stopAllMusic();
+                    
+                    // Play death sound, then play menu music when it finishes
+                    deadSound.currentTime = 0;
+                    deadSound.play().catch(err => console.log('Death sound autoplay blocked:', err));
+                    
+                    // Set up listener to play menu music when death sound finishes
+                    deadSound.onended = function() {
+                        menuMusic.currentTime = 0;
+                        menuMusic.play().catch(err => console.log('Menu music autoplay blocked:', err));
+                    };
                 }
             }
         }
@@ -2383,6 +2898,20 @@ function updateInventoryDisplay() {
 function togglePause() {
     gameState.isPaused = !gameState.isPaused;
     document.getElementById('pause-menu').style.display = gameState.isPaused ? 'flex' : 'none';
+    
+    // Pause/resume music based on game state
+    const currentMusic = 
+        currentCharacter === 'leon' ? leonMusic :
+        currentCharacter === 'claire' ? claireMusic :
+        currentCharacter === 'hunk' ? hunkMusic : null;
+    
+    if (currentMusic) {
+        if (gameState.isPaused) {
+            currentMusic.pause();
+        } else {
+            currentMusic.play().catch(err => console.log('Music resume blocked:', err));
+        }
+    }
 }
 
 function onKey(e, down) {

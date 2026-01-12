@@ -14,7 +14,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Character GLB Animation Inspector</h1>
+        <h1>Character & Enemy GLB Animation Inspector</h1>
         
         <h2>LEON</h2>
         <p>Loading leon.glb...</p>
@@ -23,6 +23,30 @@
         <h2>CLAIRE</h2>
         <p>Loading claire.glb...</p>
         <div id="claire-content"></div>
+
+        <h2>ZOMBIE1</h2>
+        <p>Loading zombie1.glb...</p>
+        <div id="zombie1-content"></div>
+
+        <h2>ZOMBIE2</h2>
+        <p>Loading zombie2.glb...</p>
+        <div id="zombie2-content"></div>
+
+        <h2>ZOMBIE3</h2>
+        <p>Loading zombie3.glb...</p>
+        <div id="zombie3-content"></div>
+
+        <h2>ZOMBIE4</h2>
+        <p>Loading zombie4.glb...</p>
+        <div id="zombie4-content"></div>
+
+        <h2>ZOMBIE5</h2>
+        <p>Loading zombie5.glb...</p>
+        <div id="zombie5-content"></div>
+
+        <h2>ZOMBIE6</h2>
+        <p>Loading zombie6.glb...</p>
+        <div id="zombie6-content"></div>
     </div>
 
     <script type="importmap">
@@ -32,66 +56,59 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        const loader = new GLTFLoader();
-        
-        // Load LEON
-        loader.load('assets/Leon/leon.glb', (gltf) => {
-            const animations = gltf.animations;
-            const content = document.getElementById('leon-content');
+        function loadModel(filePath, elementId, modelName) {
+            const loader = new GLTFLoader();
+            const content = document.getElementById(elementId);
             
-            content.innerHTML = `<p class="count">Total Animations: ${animations.length}</p>`;
-            
-            if (animations.length === 0) {
-                content.innerHTML += '<p class="error">ERROR: No animations found!</p>';
-                return;
-            }
-            
-            animations.forEach((clip, i) => {
-                const duration = clip.duration.toFixed(3);
-                content.innerHTML += `<div class="animation">${i+1}. <strong>"${clip.name}"</strong> (${duration}s)</div>`;
-            });
-            
-            console.log('=== LEON GLB ANIMATIONS ===');
-            console.log('Total:', animations.length);
-            animations.forEach((clip, i) => {
-                console.log(`${i+1}. "${clip.name}" - ${clip.duration.toFixed(3)}s`);
-            });
-        },
-        undefined,
-        (error) => {
-            document.getElementById('leon-content').innerHTML = `<p class="error">ERROR: ${error.message}</p>`;
-            console.error('Failed to load Leon:', error);
-        });
-        
-        // Load CLAIRE
-        loader.load('assets/claire/claire.glb', (gltf) => {
-            const animations = gltf.animations;
-            const content = document.getElementById('claire-content');
-            
-            content.innerHTML = `<p class="count">Total Animations: ${animations.length}</p>`;
-            
-            if (animations.length === 0) {
-                content.innerHTML += '<p class="error">ERROR: No animations found!</p>';
-                return;
-            }
-            
-            animations.forEach((clip, i) => {
-                const duration = clip.duration.toFixed(3);
-                content.innerHTML += `<div class="animation">${i+1}. <strong>"${clip.name}"</strong> (${duration}s)</div>`;
-            });
-            
-            console.log('=== CLAIRE GLB ANIMATIONS ===');
-            console.log('Total:', animations.length);
-            animations.forEach((clip, i) => {
-                console.log(`${i+1}. "${clip.name}" - ${clip.duration.toFixed(3)}s`);
-            });
-        },
-        undefined,
-        (error) => {
-            document.getElementById('claire-content').innerHTML = `<p class="error">ERROR: ${error.message}</p>`;
-            console.error('Failed to load Claire:', error);
-        });
+            loader.load(
+                filePath,
+                (gltf) => {
+                    const animations = gltf.animations;
+                    
+                    if (animations.length === 0) {
+                        content.innerHTML = '<p class="error">ERROR: No animations found!</p>';
+                        console.error(`${modelName}: No animations found`);
+                        return;
+                    }
+                    
+                    content.innerHTML = `<p class="count">Total Animations: ${animations.length}</p>`;
+                    
+                    animations.forEach((clip, i) => {
+                        const duration = clip.duration.toFixed(3);
+                        content.innerHTML += `<div class="animation">${i+1}. <strong>"${clip.name}"</strong> (${duration}s)</div>`;
+                    });
+                    
+                    console.log(`=== ${modelName.toUpperCase()} GLB ANIMATIONS ===`);
+                    console.log('Total:', animations.length);
+                    animations.forEach((clip, i) => {
+                        console.log(`${i+1}. "${clip.name}" - ${clip.duration.toFixed(3)}s`);
+                    });
+                },
+                (progress) => {
+                    // Optional: show loading progress
+                    if (progress.total > 0) {
+                        const percent = Math.round((progress.loaded / progress.total) * 100);
+                        content.innerHTML = `<p>Loading... ${percent}%</p>`;
+                    }
+                },
+                (error) => {
+                    content.innerHTML = `<p class="error">ERROR: Failed to load (${error.message || error})</p><p class="error">File: ${filePath}</p>`;
+                    console.error(`Failed to load ${modelName} from ${filePath}:`, error);
+                }
+            );
+        }
+
+        // Load all models
+        loadModel('assets/Leon/leon.glb', 'leon-content', 'LEON');
+        loadModel('assets/claire/claire.glb', 'claire-content', 'CLAIRE');
+        loadModel('assets/zombie/zombie1/zombie1.glb', 'zombie1-content', 'ZOMBIE1');
+        loadModel('assets/zombie/zombie2/zombie2.glb', 'zombie2-content', 'ZOMBIE2');
+        loadModel('assets/zombie/zombie3/zombie3.glb', 'zombie3-content', 'ZOMBIE3');
+        loadModel('assets/zombie/zombie4/zombie4.glb', 'zombie4-content', 'ZOMBIE4');
+        loadModel('assets/zombie/zombie5/zombie5.glb', 'zombie5-content', 'ZOMBIE5');
+        loadModel('assets/zombie/zombie6/zombie6.glb', 'zombie6-content', 'ZOMBIE6');
     </script>
 </body>
 </html>
+
 
