@@ -310,12 +310,19 @@ class ZombieAnimator {
 let camera, scene, renderer, clock;
 let player, currentWeaponMesh;
 let bullets = [], enemies = [], pickups = [];
-let input = { w: false, s: false, a: false, d: false, shift: false, aim: false, fire: false, mouseX: 0, mouseY: 0, m: false };
+let input = { w: false, s: false, a: false, d: false, shift: false, aim: false, fire: false, mouseX: 0, mouseY: 0, m: false, l: false, space: false };
 let inventory = [];
 let inventoryOpen = false;
 let currentCharacter = 'leon'; // Track current character
 let cameraYaw = 0; // Camera yaw rotation (horizontal) for aiming
 let cameraPitch = 0; // Camera pitch rotation (vertical) for aiming
+
+// Aim mode settings
+let gameSettings = {
+    aimMode: 'hold' // 'hold' for hold to aim, 'toggle' for press to toggle
+};
+let mouseAimToggled = false; // Track mouse aim toggle state
+let keyboardAimToggled = false; // Track keyboard aim toggle state
 
 // Leon model and animations
 let leonModel = null;
@@ -466,6 +473,55 @@ function setupUI() {
     document.getElementById('btn-claire').onclick = () => selectCharacter('claire');
     document.getElementById('btn-hunk').onclick = () => selectCharacter('hunk');
     document.getElementById('btn-resume').onclick = togglePause;
+    document.getElementById('btn-settings').onclick = openSettings;
+    document.getElementById('btn-settings-back').onclick = closeSettings;
+    
+    // Aim mode buttons
+    document.querySelectorAll('.aim-mode-btn').forEach(btn => {
+        btn.onclick = () => setAimMode(btn.dataset.mode);
+    });
+    
+    // Set initial button state
+    updateAimModeDisplay();
+}
+
+function openSettings() {
+    document.getElementById('settings-menu').style.display = 'flex';
+}
+
+function closeSettings() {
+    document.getElementById('settings-menu').style.display = 'none';
+    // Reset aim toggle states and L key when closing settings
+    mouseAimToggled = false;
+    keyboardAimToggled = false;
+    input.aim = false;
+    input.l = false;
+    document.getElementById('crosshair').style.display = 'none';
+}
+
+function setAimMode(mode) {
+    gameSettings.aimMode = mode;
+    updateAimModeDisplay();
+}
+
+function updateAimModeDisplay() {
+    const holdBtn = document.querySelector('[data-mode="hold"]');
+    const toggleBtn = document.querySelector('[data-mode="toggle"]');
+    const desc = document.getElementById('aim-mode-desc');
+    
+    if (gameSettings.aimMode === 'hold') {
+        holdBtn.style.background = '#0ff';
+        holdBtn.style.color = '#000';
+        toggleBtn.style.background = '';
+        toggleBtn.style.color = '';
+        desc.textContent = 'Hold down to aim, release to stop';
+    } else {
+        holdBtn.style.background = '';
+        holdBtn.style.color = '';
+        toggleBtn.style.background = '#0ff';
+        toggleBtn.style.color = '#000';
+        desc.textContent = 'Press to aim, press again to stop';
+    }
 }
 
 // --- LEON ANIMATOR CLASS ---
@@ -1067,6 +1123,12 @@ function selectCharacter(type) {
     claireModel = null;
     claireAnimator = null;
     
+    // Reset aim toggle states when changing characters
+    mouseAimToggled = false;
+    keyboardAimToggled = false;
+    input.aim = false;
+    document.getElementById('crosshair').style.display = 'none';
+    
     // Load Leon model asynchronously, or create block models for others
     if (type === 'leon') {
         loadLeonModel().then(model => {
@@ -1492,26 +1554,48 @@ function update(dt) {
         return; // Skip other movement while turning
     }
 
-    // 2. Mouse Look & Aim Control
-    // When aiming: mouse controls player rotation (yaw) and aim pitch (vertical)
-    // Player rotates with mouse but stays stationary (no WASD movement)
-    if (input.aim) {
-        // Horizontal mouse movement rotates the player
-        player.rotation.y -= input.mouseX * CONFIG.MOUSE_SENSITIVITY;
+    // 2. Keyboard Aim Control (L key) and Mouse Look & Aim Control
+    // L key aiming: WASD controls pitch/yaw, player is locked in place
+    // Mouse aiming: mouse controls player rotation and pitch
+    
+    if (keyboardAimToggled) {
+        // Keyboard aim mode (L key toggle)
+        input.aim = true;
         
-        // Vertical mouse movement controls aim pitch
-        cameraPitch -= input.mouseY * CONFIG.MOUSE_SENSITIVITY;
+        // W/S controls aim pitch (up/down)
+        if (input.w) {
+            cameraPitch += CONFIG.MOUSE_SENSITIVITY * 100 * dt;
+        }
+        if (input.s) {
+            cameraPitch -= CONFIG.MOUSE_SENSITIVITY * 100 * dt;
+        }
         cameraPitch = Math.max(-Math.PI/3, Math.min(Math.PI/3, cameraPitch));
         
+        // A/D controls yaw (left/right)
+        if (input.a) {
+            player.rotation.y += CONFIG.ROTATION_SPEED * dt;
+        }
+        if (input.d) {
+            player.rotation.y -= CONFIG.ROTATION_SPEED * dt;
+        }
+        
         gameState.aimPitch = cameraPitch;
+        if(!inventoryOpen) document.getElementById('crosshair').style.display = 'block';
     } else {
-        // Reset camera pitch when not aiming
+        // Exit keyboard aim - reset aim state
+        input.aim = false;
         cameraPitch = 0;
         gameState.aimPitch = 0;
         gameState.shotgunAdsPlayed = false;
+        if(!inventoryOpen) document.getElementById('crosshair').style.display = 'none';
     }
     input.mouseX = 0;
     input.mouseY = 0;
+    
+    // Handle Space key firing
+    if (input.space) {
+        input.fire = true;
+    }
     
     // Apply Pitch to Arm (for block models)
     const arm = player.getObjectByName('RightArm');
@@ -1521,11 +1605,12 @@ function update(dt) {
     }
 
     // 3. TANK CONTROLS MOVEMENT (RE4 Style)
-    // Player cannot move while aiming or reloading (except Hunk can move while aiming/reloading)
+    // Player cannot move while aiming or reloading (except Hunk can move while mouse aiming)
     let isMoving = false;
     let moveDirection = 'idle'; // idle, forward, backward, run
     
-    const canMoveWhileAiming = currentCharacter === 'hunk';
+    // Allow movement while mouse aiming for Hunk, but NOT while keyboard aiming (L key toggle)
+    const canMoveWhileAiming = currentCharacter === 'hunk' && !keyboardAimToggled;
     const canMoveWhileReloading = currentCharacter === 'hunk';
     const isAimingRestricted = input.aim && !canMoveWhileAiming;
     const isReloadingRestricted = gameState.isReloading && !canMoveWhileReloading;
@@ -1533,10 +1618,10 @@ function update(dt) {
     if (!isAimingRestricted && !isReloadingRestricted && !gameState.isDancing) {
         const charSpeed = CHARACTERS[currentCharacter].speed;
         
-        // A = Rotate LEFT (Tank Controls) / Strafe LEFT (Hunk while aiming)
+        // A = Rotate LEFT (Tank Controls) / Strafe LEFT (Hunk while mouse aiming)
         if (input.a) {
             if (input.aim && canMoveWhileAiming) {
-                // Hunk strafes left while aiming
+                // Hunk strafes left while mouse aiming
                 let strafeSpeed = charSpeed * 0.4 * dt; // Strafe is slower than forward movement
                 player.translateX(strafeSpeed);
                 isMoving = true;
@@ -1547,10 +1632,10 @@ function update(dt) {
             }
         }
         
-        // D = Rotate RIGHT (Tank Controls) / Strafe RIGHT (Hunk while aiming)
+        // D = Rotate RIGHT (Tank Controls) / Strafe RIGHT (Hunk while mouse aiming)
         if (input.d) {
             if (input.aim && canMoveWhileAiming) {
-                // Hunk strafes right while aiming
+                // Hunk strafes right while mouse aiming
                 let strafeSpeed = charSpeed * 0.4 * dt; // Strafe is slower than forward movement
                 player.translateX(-strafeSpeed);
                 isMoving = true;
@@ -2962,8 +3047,16 @@ function onKey(e, down) {
     if (e.code === 'KeyA') input.a = down;
     if (e.code === 'KeyD') input.d = down;
     if (e.code === 'KeyM') input.m = down;
+    if (e.code === 'Space') input.space = down;
     if (e.code.includes('Shift')) input.shift = down;
     if (down) {
+        if (e.code === 'KeyL') {
+            // Toggle keyboard aim
+            keyboardAimToggled = !keyboardAimToggled;
+            if (!inventoryOpen) {
+                document.getElementById('crosshair').style.display = keyboardAimToggled ? 'block' : 'none';
+            }
+        }
         if (e.code === 'KeyQ') performQuickTurn();
         if (e.code === 'KeyR') startReload();
         if (e.code === 'KeyI') toggleInventory();
@@ -2973,8 +3066,18 @@ function onKey(e, down) {
 
 function onMouse(e, down) {
     if (e.button === 2) { 
-        input.aim = down; 
-        if(!inventoryOpen) document.getElementById('crosshair').style.display = down ? 'block' : 'none';
+        if (gameSettings.aimMode === 'toggle') {
+            // Toggle mode
+            if (down) {
+                mouseAimToggled = !mouseAimToggled;
+                input.aim = mouseAimToggled;
+                if(!inventoryOpen) document.getElementById('crosshair').style.display = mouseAimToggled ? 'block' : 'none';
+            }
+        } else {
+            // Hold mode (default)
+            input.aim = down;
+            if(!inventoryOpen) document.getElementById('crosshair').style.display = down ? 'block' : 'none';
+        }
     }
     if (e.button === 0) input.fire = down;
 }

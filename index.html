@@ -40,7 +40,25 @@
         <div class="char-card" id="btn-claire"><h3 style="color:#ff4444">CLAIRE</h3>Stats: Fast</div>
         <div class="char-card" id="btn-hunk"><h3 style="color:#888888">HUNK</h3>Stats: Tank</div>
     </div>
-    <p class="controls-text">W/S: Move Forward/Back | A/D: Turn Left/Right | SHIFT: Run | RMB: Aim | LMB: Fire | R: Reload | Q: Quick Turn | I: Inventory | P: Pause | M: Dance (Leon)</p>
+    <p class="controls-text">W/S: Move Forward/Back | A/D: Turn Left/Right | SHIFT: Run | RMB: Aim | LMB: Fire | L: Aim (ADS) | SPACE: Fire (ADS) | R: Reload | Q: Quick Turn | I: Inventory | P: Pause | M: Dance (Leon)</p>
+    <div style="margin-top: 20px; text-align: center;">
+        <button class="btn" id="btn-settings" style="padding: 10px 20px;">SETTINGS</button>
+    </div>
+</div>
+
+<div id="settings-menu" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; flex-direction: column; justify-content: center; align-items: center;">
+    <div style="background: #111; padding: 40px; border: 2px solid #0ff; text-align: center; max-width: 500px;">
+        <h2 style="color: #0ff; margin-bottom: 30px;">SETTINGS</h2>
+        <div style="margin-bottom: 30px;">
+            <h3 style="color: #fff; margin-bottom: 15px;">AIM MODE</h3>
+            <div style="display: flex; justify-content: center; gap: 20px;">
+                <button class="btn aim-mode-btn" data-mode="hold" style="padding: 10px 20px; background: #0ff; color: #000;">HOLD</button>
+                <button class="btn aim-mode-btn" data-mode="toggle" style="padding: 10px 20px;">TOGGLE</button>
+            </div>
+            <p id="aim-mode-desc" style="color: #aaa; margin-top: 15px; font-size: 12px;">Hold down to aim, release to stop</p>
+        </div>
+        <button class="btn" id="btn-settings-back" style="padding: 10px 30px; margin-top: 20px;">BACK</button>
+    </div>
 </div>
 
 <div id="pause-menu">
